@@ -1,8 +1,10 @@
 mod action;
+pub mod literals;
 mod parser;
-mod literals;
 
 pub use action::{Action, Constant, Function, Number};
+use parser::Parser;
+use std::str::FromStr;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Expression {
@@ -27,8 +29,8 @@ impl Expression {
         Self::new_empty(Action::Num(number.into()))
     }
 
-    pub fn create_variable(name: String) -> Self {
-        Self::new_empty(Action::Var(name))
+    pub fn create_variable<T: ToString>(name: T) -> Self {
+        Self::new_empty(Action::Var(name.to_string()))
     }
 
     pub fn create_function<T: Into<Function>>(fun: T, args: Vec<Expression>) -> Self {
@@ -39,8 +41,28 @@ impl Expression {
         Self::new_empty(Action::Const(c.into()))
     }
 
-    pub fn create_error(message: String) -> Self {
-        Self::new_empty(Action::Err(message))
+    pub fn create_error<T: ToString>(message: T) -> Self {
+        Self::new_empty(Action::Err(message.to_string()))
+    }
+}
+
+impl From<i32> for Expression {
+    fn from(i: i32) -> Self {
+        Self::create_value(i)
+    }
+}
+
+impl FromStr for Expression {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Parser::new(s).parse()
+    }
+}
+
+impl From<&str> for Expression {
+    fn from(s: &str) -> Self {
+        Self::from_str(s).unwrap()
     }
 }
 
@@ -102,15 +124,16 @@ impl std::fmt::Display for Expression {
             }
             f.write_str(")")?;
         } else {
-            f.write_str(&self.children[0].to_string())?;
-            for i in 1..self.children.len() {
-                f.write_str(&self.action.to_string())?;
-                if self.children[i].action < self.action {
-                    f.write_str("(")?;
+            for i in 0..self.children.len() {
+                if i > 0 {
+                    f.write_str(&self.action.to_string())?;
                 }
-                f.write_str(&self.children[i].to_string())?;
-                if self.children[i].action < self.action {
+                if self.children[i].action <= self.action {
+                    f.write_str("(")?;
+                    f.write_str(&self.children[i].to_string())?;
                     f.write_str(")")?;
+                } else {
+                    f.write_str(&self.children[i].to_string())?;
                 }
             }
         }

@@ -6,6 +6,7 @@ use nom::{
     sequence::{preceded, separated_pair, terminated},
     IResult, Parser as _,
 };
+
 use std::str::FromStr;
 
 use super::literals;
@@ -14,14 +15,6 @@ use super::Expression;
 use super::Number;
 
 type ParseResult<'a, T> = IResult<&'a str, T>;
-
-impl FromStr for Expression {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Parser::new(s).parse()
-    }
-}
 
 #[derive(Debug, Clone, PartialEq)]
 enum TokenType {
@@ -137,13 +130,13 @@ impl std::fmt::Debug for Token {
     }
 }
 
-struct Parser {
+pub(crate) struct Parser {
     text: String,
     current_token: Option<Token>,
 }
 
 impl Parser {
-    fn new<T: ToString>(text: T) -> Self {
+    pub fn new<T: ToString>(text: T) -> Self {
         Parser {
             text: text.to_string(),
             current_token: None,

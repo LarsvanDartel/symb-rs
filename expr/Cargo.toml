@@ -1,10 +1,9 @@
 [package]
-name = "symb-rs"
+name = "expr"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-expr = { path = "expr"}
-expr_macro = { path = "expr_macro"}
+nom = "7.1.3"

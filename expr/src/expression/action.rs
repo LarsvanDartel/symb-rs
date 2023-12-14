@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use super::literals;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Action {
     /// Addition
     Add,
@@ -41,14 +41,14 @@ pub enum Action {
 
 impl std::fmt::Display for Action {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.clone() {
+        match &self {
             Action::Add => f.write_str(literals::ADD),
             Action::Sub => f.write_str(literals::SUB),
             Action::Mul => f.write_str(literals::MUL),
             Action::Div => f.write_str(literals::DIV),
             Action::Pow => f.write_str(literals::POW),
             Action::Equals => f.write_str(literals::EQUALS),
-            Action::Var(name) => f.write_str(&name),
+            Action::Var(name) => f.write_str(name),
             Action::Num(number) => f.write_str(&number.to_string()),
             Action::Fun(function) => f.write_str(&function.to_string()),
             Action::Const(c) => f.write_str(&c.to_string()),
@@ -57,54 +57,33 @@ impl std::fmt::Display for Action {
     }
 }
 
-impl PartialEq for Action {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Action::Add, Action::Add) => true,
-            (Action::Sub, Action::Sub) => true,
-            (Action::Add, Action::Sub) => true,
-            (Action::Sub, Action::Add) => true,
+#[derive(Debug, Clone, PartialEq)]
+pub enum Priority {
+    AddSub = 1,
+    MulDiv = 2,
+    Pow = 3,
+    None = 4,
+}
 
-            (Action::Mul, Action::Mul) => true,
-            (Action::Div, Action::Div) => true,
-            (Action::Mul, Action::Div) => true,
-            (Action::Div, Action::Mul) => true,
-
-            (Action::Pow, Action::Pow) => true,
-            (Action::Var(..), Action::Var(..)) => true,
-            (Action::Num(..), Action::Num(..)) => true,
-            (Action::Fun(..), Action::Fun(..)) => true,
-            (Action::Const(..), Action::Const(..)) => true,
-            (Action::Err(..), Action::Err(..)) => true,
-            (Action::Equals, Action::Equals) => true,
-
-            _ => false,
+impl Action {
+    pub fn priority(&self) -> Priority {
+        match self {
+            Action::Add | Action::Sub => Priority::AddSub,
+            Action::Mul | Action::Div => Priority::MulDiv,
+            Action::Pow => Priority::Pow,
+            _ => Priority::None,
         }
     }
 }
-
-const PRIORITY: [Action; 5] = [
-    Action::Add,
-    Action::Sub,
-    Action::Mul,
-    Action::Div,
-    Action::Pow,
-];
 
 impl PartialOrd for Action {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let self_index = PRIORITY.iter().position(|x| x == self);
-        let other_index = PRIORITY.iter().position(|x| x == other);
-
-        if self_index.is_none() || other_index.is_none() {
-            return None;
-        }
-
-        self_index.partial_cmp(&other_index)
+        Some((self.priority() as u8).cmp(&(other.priority() as u8)))
     }
 }
 
-#[derive(Debug, Clone)]
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Number {
     /// Integer
     Int(i32),
@@ -184,7 +163,7 @@ impl std::fmt::Display for Number {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Constant {
     /// Pi
     Pi,
@@ -226,7 +205,7 @@ impl std::fmt::Display for Constant {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Function {
     /// Sine
     Sin,
