@@ -1,9 +1,10 @@
 use std::num::ParseIntError;
 use std::str::FromStr;
 
+use crate::Expression;
+
 use super::literals;
 
-#[derive(Debug, Clone, PartialEq)]
 pub enum Action {
     /// Addition
     Add,
@@ -24,10 +25,10 @@ pub enum Action {
     Equals,
 
     /// Variable
-    Var(String),
+    Var { name: String },
 
     /// Number
-    Num(Number),
+    Num { value: Number },
 
     /// Function
     Fun(Function),
@@ -37,24 +38,18 @@ pub enum Action {
 
     /// Error
     Err(String),
-}
 
-impl std::fmt::Display for Action {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            Action::Add => f.write_str(literals::ADD),
-            Action::Sub => f.write_str(literals::SUB),
-            Action::Mul => f.write_str(literals::MUL),
-            Action::Div => f.write_str(literals::DIV),
-            Action::Pow => f.write_str(literals::POW),
-            Action::Equals => f.write_str(literals::EQUALS),
-            Action::Var(name) => f.write_str(name),
-            Action::Num(number) => f.write_str(&number.to_string()),
-            Action::Fun(function) => f.write_str(&function.to_string()),
-            Action::Const(c) => f.write_str(&c.to_string()),
-            Action::Err(message) => f.write_fmt(format_args!("Error: {}", message)),
-        }
-    }
+    /// Placeholder for a single expression
+    Slot {
+        name: String,
+        predicate: &'static dyn Fn(&Expression) -> bool,
+    },
+
+    /// Placeholder for a list of expressions
+    Segment {
+        name: String,
+        predicate: &'static dyn Fn(&Expression) -> bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -74,6 +69,35 @@ impl Action {
             _ => Priority::None,
         }
     }
+
+    pub fn identity(&self) -> Expression {
+        match self {
+            Self::Add => Expression::create_value(0),
+            Self::Mul => Expression::create_value(1),
+            _ => panic!("No identity for {:?}", self),
+        }
+    }
+}
+
+impl PartialEq for Action {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Var { name: a }, Self::Var { name: b }) => a == b,
+            (Self::Num { value: a }, Self::Num { value: b }) => a == b,
+            (Self::Fun(a), Self::Fun(b)) => a == b,
+            (Self::Const(a), Self::Const(b)) => a == b,
+            (Self::Err(_), Self::Err(_)) => false,
+            (Self::Slot { name: a, .. }, Self::Slot { name: b, .. }) => a == b,
+            (Self::Segment { name: a, .. }, Self::Segment { name: b, .. }) => a == b,
+            (Self::Add, Self::Add) => true,
+            (Self::Sub, Self::Sub) => true,
+            (Self::Mul, Self::Mul) => true,
+            (Self::Div, Self::Div) => true,
+            (Self::Pow, Self::Pow) => true,
+            (Self::Equals, Self::Equals) => true,
+            _ => false,
+        }
+    }
 }
 
 impl PartialOrd for Action {
@@ -82,6 +106,73 @@ impl PartialOrd for Action {
     }
 }
 
+impl Clone for Action {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Add => Self::Add,
+            Self::Sub => Self::Sub,
+            Self::Mul => Self::Mul,
+            Self::Div => Self::Div,
+            Self::Pow => Self::Pow,
+            Self::Equals => Self::Equals,
+            Self::Var { name } => Self::Var { name: name.clone() },
+            Self::Num { value } => Self::Num {
+                value: value.clone(),
+            },
+            Self::Fun(arg0) => Self::Fun(arg0.clone()),
+            Self::Const(arg0) => Self::Const(arg0.clone()),
+            Self::Err(arg0) => Self::Err(arg0.clone()),
+            Self::Slot { name, predicate } => Self::Slot {
+                name: name.clone(),
+                predicate: *predicate,
+            },
+            Self::Segment { name, predicate } => Self::Segment {
+                name: name.clone(),
+                predicate: *predicate,
+            },
+        }
+    }
+}
+
+impl std::fmt::Display for Action {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self {
+            Action::Add => f.write_str(literals::ADD),
+            Action::Sub => f.write_str(literals::SUB),
+            Action::Mul => f.write_str(literals::MUL),
+            Action::Div => f.write_str(literals::DIV),
+            Action::Pow => f.write_str(literals::POW),
+            Action::Equals => f.write_str(literals::EQUALS),
+            Action::Var { name } => f.write_str(name),
+            Action::Num { value } => f.write_str(&value.to_string()),
+            Action::Fun(function) => f.write_str(&function.to_string()),
+            Action::Const(c) => f.write_str(&c.to_string()),
+            Action::Err(message) => f.write_fmt(format_args!("Error: {}", message)),
+            Action::Slot { name, .. } => f.write_str(name),
+            Action::Segment { name, .. } => f.write_str(name),
+        }
+    }
+}
+
+impl std::fmt::Debug for Action {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Add => write!(f, "Add"),
+            Self::Sub => write!(f, "Sub"),
+            Self::Mul => write!(f, "Mul"),
+            Self::Div => write!(f, "Div"),
+            Self::Pow => write!(f, "Pow"),
+            Self::Equals => write!(f, "Equals"),
+            Self::Var { name } => f.debug_struct("Var").field("name", name).finish(),
+            Self::Num { value } => f.debug_struct("Num").field("value", value).finish(),
+            Self::Fun(arg0) => f.debug_tuple("Fun").field(arg0).finish(),
+            Self::Const(arg0) => f.debug_tuple("Const").field(arg0).finish(),
+            Self::Err(arg0) => f.debug_tuple("Err").field(arg0).finish(),
+            Self::Slot { name, .. } => f.debug_struct("Slot").field("name", name).finish(),
+            Self::Segment { name, .. } => f.debug_struct("Segment").field("name", name).finish(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Number {
@@ -117,17 +208,20 @@ impl FromStr for Number {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parts = s.split('.');
-        let int = parts.next().unwrap().parse::<i32>()?;
-        if let Some(dec) = parts.next() {
+        if s.contains('/') {
+            let mut parts = s.split('/');
+            let num = parts.next().unwrap().parse::<i32>()?;
+            let den = parts.next().unwrap().parse::<i32>()?;
+            Ok(Number::Rational(num, den))
+        } else if s.contains('.') {
+            let mut parts = s.split('.');
+            let int = parts.next().unwrap().parse::<i32>()?;
+            let dec = parts.next().unwrap();
+            let den = 10i32.pow(dec.len() as u32);
             let dec = dec.parse::<i32>()?;
-            let mut den = 1;
-            for _ in 0..dec.to_string().len() {
-                den *= 10;
-            }
             Ok(Number::Rational(int * den + dec, den))
         } else {
-            Ok(Number::Int(int))
+            Ok(Number::Int(s.parse::<i32>()?))
         }
     }
 }
@@ -236,6 +330,9 @@ pub enum Function {
 
     /// Integral
     Int,
+
+    /// Absolute value
+    Abs,
 }
 
 impl FromStr for Function {
@@ -253,6 +350,7 @@ impl FromStr for Function {
             literals::LOG => Ok(Function::Log),
             literals::DIFF => Ok(Function::Diff),
             literals::INT => Ok(Function::Int),
+            literals::ABS => Ok(Function::Abs),
             _ => Err(format!("Unknown function: {}", s)),
         }
     }
@@ -283,6 +381,7 @@ impl std::fmt::Display for Function {
             Function::Log => f.write_str(literals::LOG),
             Function::Diff => f.write_str(literals::DIFF),
             Function::Int => f.write_str(literals::INT),
+            Function::Abs => f.write_str(literals::ABS),
         }
     }
 }

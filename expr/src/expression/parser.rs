@@ -75,39 +75,47 @@ impl Token {
         alt((
             separated_pair(digit0, tag("."), digit1)
                 .map(|(a, b)| Token::new(TokenType::Number, format!("{}.{}", a, b))),
+            separated_pair(digit0, tag("/"), digit1)
+                .map(|(a, b)| Token::new(TokenType::Number, format!("{}/{}", a, b))),
             digit1.map(|a: &str| Token::new(TokenType::Number, a)),
         ))
         .parse(input)
     }
 
     fn parse_function(input: &str) -> ParseResult<Self> {
-        terminated(
-            alt((
-                tag(literals::SIN),
-                tag(literals::COS),
-                tag(literals::TAN),
-                tag(literals::SQRT),
-                tag(literals::ROOT),
-                tag(literals::EXP),
-                tag(literals::LN),
-                tag(literals::LOG),
-                tag(literals::DIFF),
-                tag(literals::INT),
-            )),
-            peek(one_of(literals::LEFT_PARENTHESES)),
-        )
-        .map(|function: &str| Token::new(TokenType::Function, function))
-        .parse(input)
+        for &f in literals::FUNCTIONS.iter() {
+            if let Ok((i, _)) = terminated(
+                tag::<&str, &str, nom::error::Error<&str>>(f),
+                peek(one_of(literals::LEFT_PARENTHESES)),
+            )
+            .parse(input)
+            {
+                return Ok((i, Token::new(TokenType::Function, f)));
+            }
+        }
+
+        Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )))
     }
 
     fn parse_constant(input: &str) -> ParseResult<Token> {
-        alt((
-            tag(literals::PI_SHORT),
-            tag(literals::PI),
-            tag(literals::EULER),
-        ))
-        .map(|constant: &str| Token::new(TokenType::Constant, constant))
-        .parse(input)
+        for &c in literals::CONSTANTS.iter() {
+            if let Ok((i, _)) = terminated(
+                tag::<&str, &str, nom::error::Error<&str>>(c),
+                peek(alt((tag(literals::COMMA), tag(literals::RIGHT_PARENTHESES)))),
+            )
+            .parse(input)
+            {
+                return Ok((i, Token::new(TokenType::Constant, c)));
+            }
+        }
+
+        Err(nom::Err::Error(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )))
     }
 }
 
