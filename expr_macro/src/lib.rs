@@ -67,6 +67,17 @@ fn parse_expr(input: &mut Peekable<IntoIter>, expect_group: bool) -> TokenStream
                 if punct.as_char() == '~' {
                     return prase_pattern(input);
                 }
+                
+                if punct.as_char() == '-' {
+                    if let Some(TokenTree::Literal(literal)) = input.peek() {
+                        let output = quote! {
+                            expr::Expression::create_value(-#literal)
+                        };
+                        input.next();
+                        return output;
+                    }
+                }
+                
                 let action = match punct.as_char() {
                     '+' => quote! { expr::Action::Add },
                     '-' => quote! { expr::Action::Sub },
@@ -75,14 +86,6 @@ fn parse_expr(input: &mut Peekable<IntoIter>, expect_group: bool) -> TokenStream
                     '^' => quote! { expr::Action::Pow },
                     _ => panic!("Unexpected operator"),
                 };
-
-                if punct.as_char() == '-' {
-                    if let Some(TokenTree::Literal(literal)) = input.peek() {
-                        return quote! {
-                            expr::Expression::create_value(-#literal)
-                        };
-                    }
-                }
 
                 let children = parse_expr(input, true);
 
@@ -125,21 +128,69 @@ fn prase_pattern(input: &mut Peekable<IntoIter>) -> TokenStream {
             panic!("Expected identifier or '~'")
         }
 
-        let mut predicate = None;
+        let mut predicates = Vec::new();
         if let Some(TokenTree::Punct(punct)) = input.peek() {
             if punct.as_char() == ':' {
                 input.next();
-                if let Some(TokenTree::Ident(ident)) = input.next() {
-                    predicate = Some(ident);
+                if let Some(token) = input.next() {
+                    if let TokenTree::Ident(ident) = token {
+                        predicates.push(ident);
+                    } else if let TokenTree::Group(group) = token {
+                        let mut group = group.stream().into_iter().peekable();
+                        if let Some(TokenTree::Ident(ident)) = group.next() {
+                            predicates.push(ident);
+                        } else {
+                            panic!("Expected identifier after ':'")
+                        }
+                        while let Some(TokenTree::Punct(punct)) = group.next() {
+                            if punct.as_char() == ',' {
+                                if let Some(TokenTree::Ident(ident)) = group.next() {
+                                    predicates.push(ident);
+                                } else {
+                                    panic!("Expected identifier after ','")
+                                }
+                            } else {
+                                panic!("Expected ',' after identifier")
+                            }
+                        }
+                    } else {
+                        panic!("Expected identifier after ':'")
+                    }
                 } else {
                     panic!("Expected predicate after ':'")
                 }
             }
         }
 
-        let predicate = match predicate {
-            Some(predicate) => quote! { &#predicate },
-            None => quote! { &|_| true },
+        let predicates = predicates
+            .iter()
+            .map(|ident| match ident.to_string().as_str() {
+                "number" => quote! { expr::predicates::number },
+                "integer" => quote! { expr::predicates::integer },
+                "positive" => quote! { expr::predicates::positive },
+                "nonnegative" => quote! { expr::predicates::nonnegative },
+                "negative" => quote! { expr::predicates::negative },
+                "nonpositive" => quote! { expr::predicates::nonpositive },
+                "constant" => quote! { expr::predicates::constant },
+                "variable" => quote! { expr::predicates::variable },
+                "value" => quote! { expr::predicates::value },
+                _ => quote! { #ident },
+            })
+            .collect::<Vec<_>>();
+
+        let predicate = if predicates.is_empty() {
+            quote! { &|_| true }
+        } else {
+            let mut predicate = quote!(&|e|);
+            for i in 0..predicates.len() {
+                let ident = &predicates[i];
+                if i == 0 {
+                    predicate.extend(quote! { #ident(e) });
+                } else {
+                    predicate.extend(quote! { && #ident(e) });
+                }
+            }
+            predicate
         };
 
         if is_segment {

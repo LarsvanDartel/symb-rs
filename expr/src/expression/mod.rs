@@ -1,5 +1,6 @@
 mod action;
 pub mod literals;
+pub mod predicates;
 mod parser;
 
 pub use action::{Action, Constant, Function, Number};
@@ -52,39 +53,71 @@ impl Expression {
 
 impl Expression {
     pub fn is_number(&self) -> bool {
-        if let Action::Num { .. } = self.action {
+        if let Action::Num { .. } = &self.action {
             true
         } else {
             false
         }
     }
-    
+
+    pub fn is_integer(&self) -> bool {
+        if let Action::Num { value: Number::Int(_) } = &self.action {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_positive(&self) -> bool {
+        if let Action::Num { value } = &self.action {
+            value > &Number::Int(0)
+        } else {
+            false
+        }
+    }
+
+    pub fn is_nonnegative(&self) -> bool {
+        if let Action::Num { value } = &self.action {
+            value >= &Number::Int(0)
+        } else {
+            false
+        }
+    }
+
+    pub fn is_negative(&self) -> bool {
+        if let Action::Num { value } = &self.action {
+            value < &Number::Int(0)
+        } else {
+            false
+        }
+    }
+
+    pub fn is_nonpositive(&self) -> bool {
+        if let Action::Num { value } = &self.action {
+            value <= &Number::Int(0)
+        } else {
+            false
+        }
+    }
+
+    pub fn is_constant(&self) -> bool {
+        if let Action::Const(_) = &self.action {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_value(&self) -> bool {
+        self.is_number() || self.is_constant()
+    }
+
     pub fn is_variable(&self) -> bool {
-        if let Action::Var { .. } = self.action {
+        if let Action::Var { .. } = &self.action {
             true
         } else {
             false
         }
-    }
-}
-
-impl From<i32> for Expression {
-    fn from(i: i32) -> Self {
-        Self::create_value(i)
-    }
-}
-
-impl FromStr for Expression {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Parser::new(s).parse()
-    }
-}
-
-impl From<&str> for Expression {
-    fn from(s: &str) -> Self {
-        Self::from_str(s).unwrap()
     }
 }
 
@@ -281,6 +314,26 @@ impl Expression {
             ),
             _ => false,
         }
+    }
+}
+
+impl From<i32> for Expression {
+    fn from(i: i32) -> Self {
+        Self::create_value(i)
+    }
+}
+
+impl FromStr for Expression {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Parser::new(s).parse()
+    }
+}
+
+impl From<&str> for Expression {
+    fn from(s: &str) -> Self {
+        Self::from_str(s).unwrap()
     }
 }
 
