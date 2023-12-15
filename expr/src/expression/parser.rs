@@ -102,12 +102,7 @@ impl Token {
 
     fn parse_constant(input: &str) -> ParseResult<Token> {
         for &c in literals::CONSTANTS.iter() {
-            if let Ok((i, _)) = terminated(
-                tag::<&str, &str, nom::error::Error<&str>>(c),
-                peek(alt((tag(literals::COMMA), tag(literals::RIGHT_PARENTHESES)))),
-            )
-            .parse(input)
-            {
+            if let Ok((i, _)) = tag::<&str, &str, nom::error::Error<&str>>(c).parse(input) {
                 return Ok((i, Token::new(TokenType::Constant, c)));
             }
         }
