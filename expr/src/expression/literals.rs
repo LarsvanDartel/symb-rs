@@ -45,3 +45,21 @@ pub const fn matching_parentheses(c: char) -> Option<char> {
         _ => None,
     }
 }
+
+pub const PREDICATES: [&str; 13] = [
+    "is_empty",
+    "is_number",
+    "is_integer",
+    "is_zero",
+    "is_one",
+    "is_positive",
+    "is_nonnegative",
+    "is_negative",
+    "is_nonpositive",
+    "is_constant",
+    "is_variable",
+    "is_value",
+    "can_combine",
+];
+
+pub const MAPS: [&str; 1] = ["reduce"];

@@ -1,34 +1,53 @@
 extern crate expr;
 extern crate expr_macro;
 
-//use std::{io::Write, str::FromStr};
-//use expr::Expression;
+use expr::rule::Rule;
+use expr::Expression;
+use std::io::Write;
 
-use std::collections::HashMap;
-
-use expr_macro::expr;
+use expr_macro::rule;
 
 fn main() {
-    //loop {
-    //    print!("> ");
-    //    std::io::stdout().flush().unwrap();
-    //    let mut input = String::new();
-    //    std::io::stdin().read_line(&mut input).unwrap();
-    //    if input.trim() == "exit" {
-    //        break;
-    //    }
-    //    let expr = Expression::from_str(&input).unwrap();
-    //    println!("{}", expr);
-    //    println!("{:?}", expr);
-    //}
+    let cleanup_rules: &[Box<dyn Rule>] = &[
+        rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b)),
+        rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b)),
+        ];
+        
+        let simplify_rules: &[Box<dyn Rule>] = &[
+        rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b)),
+        rule!("collapse addition", +(~a) => ~a),
+        rule!("numeric addition", +(~~a:is_number:can_combine, ~~b:!is_number) => +(reduce(~~a, +), ~~b)),
+        rule!("identity addition", +(~~a:!is_zero:!is_empty, ~~b:is_zero:!is_empty) => ~~a),
+        rule!("identity minus", -(~a, ~b) => +(~a, *(-1, ~b))),
+        rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b)),
+        rule!("collapse multiplication", *(~a) => ~a),
+        rule!("numeric multiplication", *(~~a:is_number:can_combine, ~~b:!is_number) => *(reduce(~~a, *), ~~b)),
+        rule!("identity multiplication", *(~~a:!is_one:!is_empty, ~~b:is_one:!is_empty) => ~~a),
+        rule!("absorber multiplication", *(~~a::!is_empty, 0) => 0),
+        rule!("identity divide", /(~a, 1) => ~a),
+        rule!("identity divide", /(~a, ~b) => *(~a, ^(~b, -1))),
+        rule!("numeric power", ^(~a:(is_number,!is_zero,!is_one), ~b:(is_integer,is_nonnegative,!is_one)) => reduce(^(~a, ~b), ^)),
+        rule!("power expansion", ^(~a:(!is_zero,!is_one), ~b:(is_integer,is_nonnegative):!is_one) => reduce(^(~a, ~b), ^)),
+        rule!("identity power", ^(~a, 1) => ~a),
+        rule!("absorber power", ^(~a:!is_zero, 0) => 1),
+        rule!("absorber power", ^(1, ~a) => 1),
+        rule!("absorber power", ^(0, ~a::!is_zero) => 0),
+    ];
 
-    let a = expr!(+(~~x:(positive), ~~y:(nonpositive)));
-    let b = expr!(+(1, -2, "0.5", "-1/2", "1/-2", "-1/-2", 0, 0.0, 1.0, -1.0));
+    loop {
+        print!("> ");
+        std::io::stdout().flush().unwrap();
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).unwrap();
+        if input.trim() == "exit" {
+            break;
+        }
+        let expr = Expression::from(input);
+        let expr = expr.apply_ruleset(cleanup_rules, false);
+        println!("Parsed: {}", expr);
 
-    let mut map = HashMap::new();
-    let matches = a.matches(&b, &mut map);
-    println!("{:?}", matches);
-    for (k, v) in map {
-        println!("{} -> {}", k, v);
+        let expr = expr.apply_ruleset(simplify_rules, true);
+        println!("Result: {}", expr);
+        println!("Result: {:?}", expr);
     }
 }

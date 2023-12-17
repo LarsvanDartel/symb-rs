@@ -265,6 +265,7 @@ impl Parser {
                 self.eat(TokenType::Sub)?;
                 Ok(-self.parse_primary()?)
             }
+            TokenType::Error => Err(token.lexeme.unwrap()),
             _ => Err(format!("Unexpected token: {:?}", self.current_token)),
         }
     }

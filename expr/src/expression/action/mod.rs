@@ -44,13 +44,21 @@ pub enum Action {
     /// Placeholder for a single expression
     Slot {
         name: String,
+        matcher: &'static dyn Fn(&Expression) -> bool,
         predicate: &'static dyn Fn(&Expression) -> bool,
     },
 
     /// Placeholder for a list of expressions
     Segment {
         name: String,
+        matcher: &'static dyn Fn(&Expression) -> bool,
         predicate: &'static dyn Fn(&Expression) -> bool,
+    },
+
+    /// Map from expression to expression
+    Map {
+        name: String,
+        map: &'static dyn Fn(&Expression) -> Expression,
     },
 }
 
@@ -69,6 +77,17 @@ impl Action {
             Action::Mul | Action::Div => Priority::MulDiv,
             Action::Pow => Priority::Pow,
             _ => Priority::None,
+        }
+    }
+
+    pub fn arity(&self) -> Option<usize> {
+        match self {
+            Action::Add | Action::Mul => None,
+            Action::Sub | Action::Div | Action::Pow => Some(2),
+            Action::Equals => Some(2),
+            Action::Fun(function) => Some(function.arity()),
+            Action::Map { .. } => Some(1),
+            _ => Some(0),
         }
     }
 
@@ -124,13 +143,27 @@ impl Clone for Action {
             Self::Fun(arg0) => Self::Fun(arg0.clone()),
             Self::Const(arg0) => Self::Const(arg0.clone()),
             Self::Err(arg0) => Self::Err(arg0.clone()),
-            Self::Slot { name, predicate } => Self::Slot {
+            Self::Slot {
+                name,
+                matcher,
+                predicate,
+            } => Self::Slot {
                 name: name.clone(),
+                matcher: *matcher,
                 predicate: *predicate,
             },
-            Self::Segment { name, predicate } => Self::Segment {
+            Self::Segment {
+                name,
+                matcher,
+                predicate,
+            } => Self::Segment {
                 name: name.clone(),
+                matcher: *matcher,
                 predicate: *predicate,
+            },
+            Self::Map { name, map } => Self::Map {
+                name: name.clone(),
+                map: *map,
             },
         }
     }
@@ -150,8 +183,9 @@ impl std::fmt::Display for Action {
             Action::Fun(function) => f.write_str(&function.to_string()),
             Action::Const(c) => f.write_str(&c.to_string()),
             Action::Err(message) => f.write_fmt(format_args!("Error: {}", message)),
-            Action::Slot { name, .. } => f.write_str(name),
-            Action::Segment { name, .. } => f.write_str(name),
+            Action::Slot { name, .. } => f.write_fmt(format_args!("~{}", name)),
+            Action::Segment { name, .. } => f.write_fmt(format_args!("~~{}", name)),
+            Action::Map { name, .. } => f.write_str(name),
         }
     }
 }
@@ -165,13 +199,20 @@ impl std::fmt::Debug for Action {
             Self::Div => write!(f, "Div"),
             Self::Pow => write!(f, "Pow"),
             Self::Equals => write!(f, "Equals"),
-            Self::Var { name } => f.debug_struct("Var").field("name", name).finish(),
-            Self::Num { value } => f.debug_struct("Num").field("value", value).finish(),
-            Self::Fun(arg0) => f.debug_tuple("Fun").field(arg0).finish(),
-            Self::Const(arg0) => f.debug_tuple("Const").field(arg0).finish(),
-            Self::Err(arg0) => f.debug_tuple("Err").field(arg0).finish(),
-            Self::Slot { name, .. } => f.debug_struct("Slot").field("name", name).finish(),
-            Self::Segment { name, .. } => f.debug_struct("Segment").field("name", name).finish(),
+            Self::Var { name } => f.debug_tuple("Var").field(name).finish(),
+            Self::Num { value } => write!(f, "{:?}", value),
+            Self::Fun(function) => write!(f, "{:?}", function),
+            Self::Const(constant) => write!(f, "{:?}", constant),
+            Self::Err(message) => f.debug_tuple("Err").field(message).finish(),
+            Self::Slot { name, .. } => f
+                .debug_struct("Slot")
+                .field("name", name)
+                .finish_non_exhaustive(),
+            Self::Segment { name, .. } => f
+                .debug_struct("Segment")
+                .field("name", name)
+                .finish_non_exhaustive(),
+            Self::Map { name, .. } => write!(f, "{:?}", name),
         }
     }
 }

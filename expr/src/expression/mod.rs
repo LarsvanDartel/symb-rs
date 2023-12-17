@@ -1,20 +1,32 @@
 mod action;
 pub mod literals;
-pub mod predicates;
 mod parser;
 
 pub use action::{Action, Constant, Function, Number};
 use parser::Parser;
 use std::{collections::HashMap, str::FromStr};
 
-#[derive(Clone, Debug, PartialEq)]
+use crate::rule::Rule;
+
+#[derive(Clone, PartialEq)]
 pub struct Expression {
     children: Vec<Expression>,
     action: Action,
 }
 
+/// Creating new expressions
 impl Expression {
     pub fn new(children: Vec<Expression>, action: Action) -> Self {
+        if let Some(arity) = action.arity() {
+            if children.len() != arity {
+                panic!(
+                    "Wrong number of arguments for {:?}: expected {}, got {}",
+                    action,
+                    arity,
+                    children.len()
+                );
+            }
+        }
         Self { children, action }
     }
 
@@ -51,8 +63,13 @@ impl Expression {
     }
 }
 
+/// Properties of expressions
 impl Expression {
-    pub fn is_number(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
+        self.children.len() == 0
+    }
+
+    pub const fn is_number(&self) -> bool {
         if let Action::Num { .. } = &self.action {
             true
         } else {
@@ -60,8 +77,33 @@ impl Expression {
         }
     }
 
-    pub fn is_integer(&self) -> bool {
-        if let Action::Num { value: Number::Int(_) } = &self.action {
+    pub const fn is_integer(&self) -> bool {
+        if let Action::Num {
+            value: Number::Int(_),
+        } = &self.action
+        {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub const fn is_zero(&self) -> bool {
+        if let Action::Num {
+            value: Number::Int(0),
+        } = &self.action
+        {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub const fn is_one(&self) -> bool {
+        if let Action::Num {
+            value: Number::Int(1),
+        } = &self.action
+        {
             true
         } else {
             false
@@ -100,7 +142,7 @@ impl Expression {
         }
     }
 
-    pub fn is_constant(&self) -> bool {
+    pub const fn is_constant(&self) -> bool {
         if let Action::Const(_) = &self.action {
             true
         } else {
@@ -108,19 +150,28 @@ impl Expression {
         }
     }
 
-    pub fn is_value(&self) -> bool {
+    pub const fn is_value(&self) -> bool {
         self.is_number() || self.is_constant()
     }
 
-    pub fn is_variable(&self) -> bool {
+    pub const fn is_variable(&self) -> bool {
         if let Action::Var { .. } = &self.action {
             true
         } else {
             false
         }
     }
+
+    pub fn can_combine(&self) -> bool {
+        if let Action::Add | Action::Mul = self.action {
+            self.children.len() > 1
+        } else {
+            false
+        }
+    }
 }
 
+/// Matching expressions
 impl Expression {
     fn match_children_unordered(
         &self,
@@ -177,7 +228,7 @@ impl Expression {
             return false;
         }
 
-        // for all patterns, determine all possible matches (i.e. all children of other that are not matched and for which predicate holds)
+        // for all patterns, determine all possible matches (i.e. all children of other that are not matched yet and are matched by the pattern)
         let mut possible_matches = vec![vec![]; self_patterns.len()];
 
         for i in 0..other.children.len() {
@@ -186,9 +237,10 @@ impl Expression {
             }
             for j in 0..self_patterns.len() {
                 let p = &self.children[self_patterns[j]];
-                if let Action::Slot { predicate, .. } = p.action {
-                    if predicate(&other.children[i]) {
+                if let Action::Slot { matcher, .. } = p.action {
+                    if matcher(&other.children[i]) {
                         if other_matched[i] {
+                            patterns.clear();
                             return false;
                         }
                         possible_matches[j].push(i);
@@ -201,9 +253,10 @@ impl Expression {
             }
             for j in 0..self_patterns.len() {
                 let p = &self.children[self_patterns[j]];
-                if let Action::Segment { predicate, .. } = p.action {
-                    if predicate(&other.children[i]) {
+                if let Action::Segment { matcher, .. } = p.action {
+                    if matcher(&other.children[i]) {
                         if other_matched[i] {
+                            patterns.clear();
                             return false;
                         }
                         possible_matches[j].push(i);
@@ -231,17 +284,13 @@ impl Expression {
                     return false;
                 }
             } else if let Action::Segment { .. } = p.action {
-                let matched = if possible_matches[i].len() == 1 {
-                    other.children[possible_matches[i][0]].clone()
-                } else {
-                    Expression::new(
-                        possible_matches[i]
-                            .iter()
-                            .map(|&j| other.children[j].clone())
-                            .collect(),
-                        other.action.clone(),
-                    )
-                };
+                let matched = Expression::new(
+                    possible_matches[i]
+                        .iter()
+                        .map(|&j| other.children[j].clone())
+                        .collect(),
+                    other.action.clone(),
+                );
 
                 if !p.matches(&matched, patterns) {
                     return false;
@@ -251,6 +300,7 @@ impl Expression {
 
         true
     }
+
     fn match_children_ordered(
         &self,
         other: &Self,
@@ -272,6 +322,7 @@ impl Expression {
 
         for i in 0..self.children.len() {
             if !self.children[i].matches(&other.children[i], patterns) {
+                patterns.clear();
                 return false;
             }
         }
@@ -285,10 +336,37 @@ impl Expression {
                 Action::Segment { .. } | Action::Slot { .. },
                 Action::Segment { .. } | Action::Slot { .. },
             ) => panic!("Ambiguous pattern match"),
-            (_, Action::Slot { .. }) | (_, Action::Segment { .. }) => other.matches(self, patterns),
-            (Action::Slot { name, .. }, _) | (Action::Segment { name, .. }, _) => {
+            (_, Action::Slot { .. }) | (_, Action::Segment { .. }) => false,
+            (
+                Action::Slot {
+                    name,
+                    matcher,
+                    predicate,
+                },
+                _,
+            ) => {
                 if let Some(expr) = patterns.get(name) {
                     return expr.clone().matches(other, patterns);
+                }
+                if !matcher(other) || !predicate(other) {
+                    patterns.clear();
+                    return false;
+                }
+                patterns.insert(name.clone(), other.clone());
+                true
+            }
+            (
+                Action::Segment {
+                    name, predicate, ..
+                },
+                _,
+            ) => {
+                if let Some(expr) = patterns.get(name) {
+                    return expr.clone().matches(other, patterns);
+                }
+                if !predicate(other) {
+                    patterns.clear();
+                    return false;
                 }
                 patterns.insert(name.clone(), other.clone());
                 true
@@ -296,23 +374,170 @@ impl Expression {
             (Action::Add, Action::Add) => self.match_children_unordered(other, patterns),
             (Action::Mul, Action::Mul) => self.match_children_unordered(other, patterns),
             (a, b) if a == b => self.match_children_ordered(other, patterns),
-            (Action::Add, _) => {
+            (Action::Add, _) if self.children.len() > 1 => {
                 self.matches(&Expression::new(vec![other.clone()], Action::Add), patterns)
             }
-            (Action::Mul, _) => {
+            (Action::Mul, _) if self.children.len() > 1 => {
                 self.matches(&Expression::new(vec![other.clone()], Action::Mul), patterns)
             }
-            (_, Action::Add | Action::Mul) => other.matches(self, patterns),
-            (_, Action::Pow) => other.matches(self, patterns),
-            (Action::Pow, _) => self.matches(
-                &Expression::new_binary(
-                    other.clone(),
-                    Expression::create_value(action::Number::Int(1)),
-                    Action::Pow,
-                ),
-                patterns,
-            ),
+            (Action::Pow, _) => {
+                if self.children.iter().any(Expression::is_number) {
+                    return false;
+                }
+                self.matches(
+                    &Expression::new_binary(
+                        other.clone(),
+                        Expression::create_value(action::Number::Int(1)),
+                        Action::Pow,
+                    ),
+                    patterns,
+                )
+            }
             _ => false,
+        }
+    }
+
+    pub(crate) fn substitute_pattern(&self, patterns: &HashMap<String, Expression>) -> Self {
+        match &self.action {
+            Action::Segment { name, .. } | Action::Slot { name, .. } => {
+                if let Some(expr) = patterns.get(name) {
+                    expr.clone()
+                } else {
+                    return Expression::create_error(format!("Pattern {} not found", name));
+                }
+            }
+            Action::Map { map, .. } => map(&self.children[0].substitute_pattern(patterns)),
+            _ => {
+                let mut children = vec![];
+                for c in &self.children {
+                    if let Action::Err(_) = c.action {
+                        return c.clone();
+                    }
+                    if let Action::Segment { .. } = c.action {
+                        children.extend(c.substitute_pattern(patterns).children);
+                    } else {
+                        children.push(c.substitute_pattern(patterns));
+                    }
+                }
+                Expression::new(children, self.action.clone())
+            }
+        }
+    }
+}
+
+/// Applying rules to expressions
+impl Expression {
+    pub fn apply_ruleset(&self, rules: &[Box<dyn Rule>], print: bool) -> Expression {
+        let mut expr = self.clone();
+        loop {
+            let mut applied = false;
+            for rule in rules {
+                if let Some(new_expr) = expr.apply_rule(rule.as_ref()) {
+                    if print {
+                        println!("{}: {} = {}", rule.name(), expr, new_expr);
+                    }
+                    expr = new_expr;
+                    applied = true;
+                    break;
+                }
+            }
+            if !applied {
+                break;
+            }
+        }
+        expr
+    }
+
+    pub fn apply_rule(&self, rule: &dyn Rule) -> Option<Expression> {
+        if let Some(e) = rule.apply(self) {
+            if e == *self {
+                panic!("Rule {} is not simplifying expression", rule.name());
+            }
+            Some(e)
+        } else {
+            for (i, c) in self.children.iter().enumerate() {
+                if let Some(e) = c.apply_rule(rule) {
+                    let mut children = self.children.clone();
+                    children[i] = e;
+                    return Some(Expression::new(children, self.action.clone()));
+                }
+            }
+            None
+        }
+    }
+
+    pub fn apply_rule_unchecked(&self, rule: &dyn Rule) -> Option<Expression> {
+        if let Some(e) = rule.apply(self) {
+            Some(e)
+        } else {
+            for (i, c) in self.children.iter().enumerate() {
+                if let Some(e) = c.apply_rule_unchecked(rule) {
+                    let mut children = self.children.clone();
+                    children[i] = e;
+                    return Some(Expression::new(children, self.action.clone()));
+                }
+            }
+            None
+        }
+    }
+}
+
+/// Applying functions to expressions
+impl Expression {
+    pub fn reduce(&self, action: Action) -> Expression {
+        if let Action::Add | Action::Mul = action {
+            assert_eq!(self.action, action);
+            let mut res = if let Action::Num { value } = action.identity().action {
+                value
+            } else {
+                unreachable!()
+            };
+            for c in &self.children {
+                assert!(c.is_number());
+                if let Action::Num { value } = &c.action {
+                    res = match action {
+                        Action::Add => res + value.clone(),
+                        Action::Mul => res * value.clone(),
+                        _ => unreachable!(),
+                    };
+                } else {
+                    unreachable!()
+                }
+            }
+            Expression::create_value(res)
+        } else if let Action::Pow = action {
+            assert_eq!(self.action, action);
+            assert!(self.children.len() == 2);
+            assert!(self.children[1].is_integer());
+            assert!(self.children[1].is_nonnegative());
+            assert!(!self.children[0].is_zero());
+            assert!(!self.children[0].is_one());
+
+            let pow = if let Action::Num {
+                value: Number::Int(i),
+            } = &self.children[1].action
+            {
+                *i as usize
+            } else {
+                unreachable!()
+            };
+
+            if let Action::Num { value } = &self.children[0].action {
+                let mut res = value.clone();
+                for _ in 1..pow {
+                    res = res * value.clone();
+                }
+                return Expression::create_value(res);
+            }
+
+            Expression::new(
+                std::iter::repeat(self.children[0].clone())
+                    .take(pow)
+                    .collect(),
+                Action::Mul,
+            )
+        } else {
+            panic!("Cannot reduce {:?}", action);
         }
     }
 }
@@ -333,7 +558,13 @@ impl FromStr for Expression {
 
 impl From<&str> for Expression {
     fn from(s: &str) -> Self {
-        Self::from_str(s).unwrap()
+        Self::from_str(s).unwrap_or_else(|e| Self::create_error(e))
+    }
+}
+
+impl From<String> for Expression {
+    fn from(s: String) -> Self {
+        Self::from(s.as_str())
     }
 }
 
@@ -418,5 +649,22 @@ impl std::fmt::Display for Expression {
             }
         }
         Ok(())
+    }
+}
+
+impl std::fmt::Debug for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.children.len() == 0 {
+            write!(f, "{:?}", self.action)
+        } else {
+            write!(f, "{:?}(", self.action)?;
+            for i in 0..self.children.len() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{:?}", self.children[i])?;
+            }
+            write!(f, ")")
+        }
     }
 }

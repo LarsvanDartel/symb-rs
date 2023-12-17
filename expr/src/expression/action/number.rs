@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::Constant;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Number {
     /// Integer
     Int(i32),
@@ -71,6 +71,42 @@ impl From<Constant> for Number {
         match constant {
             Constant::Pi => Number::Real(std::f64::consts::PI),
             Constant::E => Number::Real(std::f64::consts::E),
+        }
+    }
+}
+
+impl std::ops::Add for Number {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Number::Int(a), Number::Int(b)) => Number::Int(a + b),
+            (Number::Int(a), Number::Rational(b, c)) => Number::Rational(a * c + b, c),
+            (Number::Int(a), Number::Real(b)) => Number::Real(a as f64 + b),
+            (Number::Rational(a, b), Number::Int(c)) => Number::Rational(a + b * c, b),
+            (Number::Rational(a, b), Number::Rational(c, d)) => Number::Rational(a * d + b * c, b * d),
+            (Number::Rational(a, b), Number::Real(c)) => Number::Real(a as f64 / b as f64 + c),
+            (Number::Real(a), Number::Int(b)) => Number::Real(a + b as f64),
+            (Number::Real(a), Number::Rational(b, c)) => Number::Real(a + b as f64 / c as f64),
+            (Number::Real(a), Number::Real(b)) => Number::Real(a + b),
+        }
+    }
+}
+
+impl std::ops::Mul for Number {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Number::Int(a), Number::Int(b)) => Number::Int(a * b),
+            (Number::Int(a), Number::Rational(b, c)) => Number::Rational(a * b, c),
+            (Number::Int(a), Number::Real(b)) => Number::Real(a as f64 * b),
+            (Number::Rational(a, b), Number::Int(c)) => Number::Rational(a * c, b),
+            (Number::Rational(a, b), Number::Rational(c, d)) => Number::Rational(a * c, b * d),
+            (Number::Rational(a, b), Number::Real(c)) => Number::Real(a as f64 / b as f64 * c),
+            (Number::Real(a), Number::Int(b)) => Number::Real(a * b as f64),
+            (Number::Real(a), Number::Rational(b, c)) => Number::Real(a * b as f64 / c as f64),
+            (Number::Real(a), Number::Real(b)) => Number::Real(a * b),
         }
     }
 }

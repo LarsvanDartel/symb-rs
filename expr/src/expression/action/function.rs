@@ -38,6 +38,16 @@ pub enum Function {
     Abs,
 }
 
+impl Function {
+    pub fn arity(&self) -> usize {
+        match self.clone() {
+            Function::Root | Function::Log => 2,
+            Function::Diff | Function::Int => 2,
+            _ => 1,
+        }
+    }
+}
+
 impl FromStr for Function {
     type Err = String;
 
