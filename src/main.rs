@@ -34,6 +34,7 @@ fn main() {
         rule!("absorber power", ^(1, ~a) => 1),
         rule!("absorber power", ^(0, ~a::is_positive) => 0),
         rule!("distributivity power", ^(*(~~a), ~b:(is_integer,!is_one,!is_zero)) => distribute(~~a, ~b, ^)),
+        rule!("combine powers", ^(^(~a, ~b:(!is_one)), ~c) => ^(~a, *(~b, ~c))),
     ];
 
     loop {
