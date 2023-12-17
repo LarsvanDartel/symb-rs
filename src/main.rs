@@ -11,9 +11,9 @@ fn main() {
     let cleanup_rules: &[Box<dyn Rule>] = &[
         rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b)),
         rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b)),
-        ];
-        
-        let simplify_rules: &[Box<dyn Rule>] = &[
+    ];
+
+    let simplify_rules: &[Box<dyn Rule>] = &[
         rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b)),
         rule!("collapse addition", +(~a) => ~a),
         rule!("numeric addition", +(~~a:is_number:can_combine, ~~b:!is_number) => +(reduce(~~a, +), ~~b)),
