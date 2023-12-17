@@ -406,7 +406,9 @@ impl Expression {
                     return Expression::create_error(format!("Pattern {} not found", name));
                 }
             }
-            Action::Map { map, .. } => map(&self.children[0].substitute_pattern(patterns)),
+            Action::Map { map, .. } => {
+                map(&self.children[0].substitute_pattern(patterns), patterns)
+            }
             _ => {
                 let mut children = vec![];
                 for c in &self.children {
@@ -448,7 +450,7 @@ impl Expression {
         expr
     }
 
-    pub fn apply_rule(&self, rule: &dyn Rule) -> Option<Expression> {
+    pub(crate) fn apply_rule(&self, rule: &dyn Rule) -> Option<Expression> {
         if let Some(e) = rule.apply(self) {
             if e == *self {
                 panic!("Rule {} is not simplifying expression", rule.name());
@@ -466,7 +468,8 @@ impl Expression {
         }
     }
 
-    pub fn apply_rule_unchecked(&self, rule: &dyn Rule) -> Option<Expression> {
+    #[allow(dead_code)]
+    pub(crate) fn apply_rule_unchecked(&self, rule: &dyn Rule) -> Option<Expression> {
         if let Some(e) = rule.apply(self) {
             Some(e)
         } else {
@@ -484,7 +487,7 @@ impl Expression {
 
 /// Applying functions to expressions
 impl Expression {
-    pub fn reduce(&self, action: Action) -> Expression {
+    pub fn reduce(&self, _: &HashMap<String, Expression>, action: Action) -> Expression {
         if let Action::Add | Action::Mul = action {
             assert_eq!(self.action, action);
             let mut res = if let Action::Num { value } = action.identity().action {
@@ -538,6 +541,40 @@ impl Expression {
             )
         } else {
             panic!("Cannot reduce {:?}", action);
+        }
+    }
+
+    pub fn distribute(
+        &self,
+        patterns: &HashMap<String, Expression>,
+        expr: Expression,
+        action: Action,
+    ) -> Expression {
+        let expr = expr.substitute_pattern(patterns);
+        if let Action::Mul = action {
+            assert_eq!(self.action, Action::Add);
+            let mut res = vec![];
+            if expr.children.len() == 1 {
+                for c in &self.children {
+                    res.push(c.clone() * expr.children[0].clone());
+                }
+            } else {
+                for c in &self.children {
+                    res.push(c.clone() * expr.clone());
+                }
+            }
+            Expression::new(res, Action::Add)
+        } else if let Action::Pow = action {
+            assert_eq!(self.action, Action::Mul);
+            Expression::new(
+                self.children
+                    .iter()
+                    .map(|c| c.clone() ^ expr.clone())
+                    .collect(),
+                Action::Mul,
+            )
+        } else {
+            panic!("Cannot distribute {:?}", action);
         }
     }
 }

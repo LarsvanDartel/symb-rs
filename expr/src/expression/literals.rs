@@ -62,4 +62,4 @@ pub const PREDICATES: [&str; 13] = [
     "can_combine",
 ];
 
-pub const MAPS: [&str; 1] = ["reduce"];
+pub const MAPS: [&str; 2] = ["reduce", "distribute"];

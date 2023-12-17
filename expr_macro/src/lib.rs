@@ -78,7 +78,7 @@ fn parse_expr(input: &mut Peekable<IntoIter>, expect_group: bool) -> TokenStream
                 '*' => quote! { expr::Action::Mul },
                 '/' => quote! { expr::Action::Div },
                 '^' => quote! { expr::Action::Pow },
-                _ => panic!("Unexpected operator"),
+                c => panic!("Unexpected operator '{}'", c),
             };
 
             let children = parse_expr(input, true);
@@ -278,7 +278,7 @@ fn parse_ident(ident: Ident, input: &mut Peekable<IntoIter>) -> TokenStream {
             quote! {
                 expr::Expression::new(vec![#expr], expr::Action::Map {
                     name: String::from(#name),
-                    map: &|e| e.#ident(#extra_args)
+                    map: &|e, p| e.#ident(p, #extra_args)
                 })
             }
         } else {
