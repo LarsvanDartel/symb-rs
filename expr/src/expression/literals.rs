@@ -48,6 +48,7 @@ pub const fn matching_parentheses(c: char) -> Option<char> {
 
 pub mod predicates {
     use crate::{Action, Expression, Number};
+    use num_integer::Integer;
 
     macro_rules! make_predicates {
         {$(pub fn $predicate_name:ident ($ex:ident: &Expression) -> bool $body:block)*} => {
@@ -137,6 +138,14 @@ pub mod predicates {
                 false
             }
         }
+
+        pub fn is_rational_reducible(e: &Expression) -> bool {
+            if let Action::Num{value: Number::Rational(num, den)} = e.action {
+                num.gcd(&den) != 1
+            } else {
+                false
+            }
+        }
     }
 }
 
@@ -144,6 +153,7 @@ pub mod maps {
     use super::predicates::{is_integer, is_number, is_one, is_zero};
     use crate::{Action, Expression, Number};
     use std::collections::HashMap;
+    use num_integer::Integer;
 
     macro_rules! make_maps {
         {$(pub fn $map_name:ident ($ex:ident: &Expression, $map:tt: &HashMap<String, Expression> $(, $param:ident: $param_type:ty)*) -> Expression $body:block)*} => {
@@ -211,6 +221,21 @@ pub mod maps {
                 )
             } else {
                 panic!("Cannot reduce {:?}", action);
+            }
+        }
+
+        pub fn rational_reduce(e: &Expression, _: &HashMap<String, Expression>) -> Expression {
+            if let Action::Num{value: Number::Rational(num, den)} = e.action {
+                let gcd = num.gcd(&den);
+                if gcd == den {
+                    Expression::create_value(Number::Int(num / den))
+                } else if gcd != 1 {
+                    Expression::create_value(Number::Rational(num / gcd, den / gcd))
+                } else {
+                    panic!("{:?} is not reducible", e);
+                }
+            } else {
+                panic!("Expected rational number, got {:?}", e);
             }
         }
 

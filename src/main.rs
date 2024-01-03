@@ -12,7 +12,7 @@ fn main() {
         rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b)),
     ];
 
-    let expand_rules: [&dyn Rule; 22] = [
+    let expand_rules: [&dyn Rule; 23] = [
         // Addition
         rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b)),
         rule!("collapse addition", +(~a) => ~a),
@@ -26,6 +26,7 @@ fn main() {
         rule!("identity multiplication", *(~~a:!is_one:!is_empty, ~~b:is_one:!is_empty) => ~~a),
         rule!("absorber multiplication", *(~~a::!is_empty, 0) => 0),
         rule!("distributivity multiplication", *(~~a::!is_empty, +(~~b)) => distribute(~~b, ~~a, *)),
+        rule!("rational simplification", ~a:is_rational_reducible => rational_reduce(~a)),
         rule!("identity divide", /(~a, 1) => ~a),
         rule!("identity divide", /(~a, ~b) => *(~a, ^(~b, -1))),
         // Powers
