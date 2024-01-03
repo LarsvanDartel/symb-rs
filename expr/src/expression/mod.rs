@@ -3,6 +3,7 @@ pub mod literals;
 mod parser;
 
 pub use action::{Action, Constant, Function, Number};
+pub use literals::{maps, predicates};
 use parser::Parser;
 use std::{collections::HashMap, str::FromStr};
 
@@ -63,86 +64,12 @@ impl Expression {
     }
 }
 
-/// Properties of expressions
-impl Expression {
-    pub fn is_empty(&self) -> bool {
-        self.children.is_empty()
-    }
-
-    pub const fn is_number(&self) -> bool {
-        matches!(&self.action, Action::Num { .. })
-    }
-
-    pub const fn is_integer(&self) -> bool {
-        matches!(
-            self.action,
-            Action::Num {
-                value: Number::Int(_)
-            }
-        )
-    }
-
-    pub const fn is_zero(&self) -> bool {
-        matches!(
-            self.action,
-            Action::Num {
-                value: Number::Int(0)
-            }
-        )
-    }
-
-    pub const fn is_one(&self) -> bool {
-        matches!(
-            self.action,
-            Action::Num {
-                value: Number::Int(1)
-            }
-        )
-    }
-
-    pub fn is_positive(&self) -> bool {
-        matches!(&self.action, Action::Num { value } if value > &Number::Int(0))
-    }
-
-    pub fn is_nonnegative(&self) -> bool {
-        matches!(&self.action, Action::Num { value } if value >= &Number::Int(0))
-    }
-
-    pub fn is_negative(&self) -> bool {
-        matches!(&self.action, Action::Num { value } if value < &Number::Int(0))
-    }
-
-    pub fn is_nonpositive(&self) -> bool {
-        matches!(&self.action, Action::Num { value } if value <= &Number::Int(0))
-    }
-
-    pub const fn is_constant(&self) -> bool {
-        matches!(&self.action, Action::Const(_))
-    }
-
-    pub const fn is_value(&self) -> bool {
-        self.is_number() || self.is_constant()
-    }
-
-    pub const fn is_variable(&self) -> bool {
-        matches!(&self.action, Action::Var { .. })
-    }
-
-    pub fn can_combine(&self) -> bool {
-        if let Action::Add | Action::Mul = self.action {
-            self.children.len() > 1
-        } else {
-            false
-        }
-    }
-
-    pub const fn is_pattern(&self) -> bool {
-        matches!(&self.action, Action::Slot { .. } | Action::Segment { .. })
-    }
-}
-
 /// Matching expressions
 impl Expression {
+    fn is_pattern(&self) -> bool {
+        matches!(self.action, Action::Slot { .. } | Action::Segment { .. })
+    }
+
     fn match_children_unordered(
         &self,
         other: &Self,
@@ -339,7 +266,11 @@ impl Expression {
                 self.matches(&Expression::new(vec![other.clone()], Action::Mul), patterns)
             }
             (Action::Pow, _) => {
-                if self.children.iter().any(Expression::is_number) {
+                if self
+                    .children
+                    .iter()
+                    .any(|c| matches!(c.action, Action::Num { .. }))
+                {
                     return false;
                 }
                 self.matches(
@@ -439,103 +370,6 @@ impl Expression {
                 }
             }
             None
-        }
-    }
-}
-
-/// Applying functions to expressions
-impl Expression {
-    pub fn reduce(&self, _: &HashMap<String, Expression>, action: Action) -> Expression {
-        if let Action::Add | Action::Mul = action {
-            assert_eq!(self.action, action);
-            let mut res = if let Action::Num { value } = action.identity().action {
-                value
-            } else {
-                unreachable!()
-            };
-            for c in &self.children {
-                assert!(c.is_number());
-                if let Action::Num { value } = &c.action {
-                    res = match action {
-                        Action::Add => res + *value,
-                        Action::Mul => res * *value,
-                        _ => unreachable!(),
-                    };
-                } else {
-                    unreachable!()
-                }
-            }
-            Expression::create_value(res)
-        } else if let Action::Pow = action {
-            assert_eq!(self.action, action);
-            assert!(self.children.len() == 2);
-            assert!(self.children[1].is_integer());
-            assert!(!self.children[0].is_zero());
-            assert!(!self.children[0].is_one());
-
-            let (negative, pow) = if let Action::Num {
-                value: Number::Int(i),
-            } = &self.children[1].action
-            {
-                (*i < 0, i.unsigned_abs() as usize)
-            } else {
-                unreachable!()
-            };
-
-            if let Action::Num { value } = &self.children[0].action {
-                let mut res = *value;
-                for _ in 1..pow {
-                    res = res * *value;
-                }
-                if negative {
-                    res = res.inverse();
-                }
-                return Expression::create_value(res);
-            }
-
-            assert!(!negative);
-            Expression::new(
-                std::iter::repeat(self.children[0].clone())
-                    .take(pow)
-                    .collect(),
-                Action::Mul,
-            )
-        } else {
-            panic!("Cannot reduce {:?}", action);
-        }
-    }
-
-    pub fn distribute(
-        &self,
-        patterns: &HashMap<String, Expression>,
-        expr: Expression,
-        action: Action,
-    ) -> Expression {
-        let expr = expr.substitute_pattern(patterns);
-        if let Action::Mul = action {
-            assert_eq!(self.action, Action::Add);
-            let mut res = vec![];
-            if expr.children.len() == 1 {
-                for c in &self.children {
-                    res.push(c.clone() * expr.children[0].clone());
-                }
-            } else {
-                for c in &self.children {
-                    res.push(c.clone() * expr.clone());
-                }
-            }
-            Expression::new(res, Action::Add)
-        } else if let Action::Pow = action {
-            assert_eq!(self.action, Action::Mul);
-            Expression::new(
-                self.children
-                    .iter()
-                    .map(|c| c.clone() ^ expr.clone())
-                    .collect(),
-                Action::Mul,
-            )
-        } else {
-            panic!("Cannot distribute {:?}", action);
         }
     }
 }

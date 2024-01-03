@@ -1,7 +1,7 @@
 extern crate expr;
 extern crate expr_macro;
 
-use expr::{Expression, Rule};
+use expr::{Expression, Rule, predicates::*, maps::*};
 use std::io::Write;
 
 use expr_macro::rule;

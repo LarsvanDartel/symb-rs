@@ -5,7 +5,7 @@ use std::iter::Peekable;
 
 use expr::literals;
 use proc_macro2::{token_stream::IntoIter, Group, Ident, TokenStream, TokenTree};
-use quote::quote;
+use quote::{quote, ToTokens};
 
 #[proc_macro]
 pub fn symb(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -227,10 +227,6 @@ fn parse_predicate(input: &mut Peekable<IntoIter>) -> TokenStream {
     }
 
     if let TokenTree::Ident(ident) = token {
-        if literals::PREDICATES.contains(&ident.to_string().as_str()) {
-            predicate.extend(quote! { e.#ident() });
-            return predicate;
-        }
         predicate.extend(quote! { #ident(e) });
     } else {
         panic!("Expected identifier after ':'")
@@ -249,7 +245,7 @@ fn parse_ident(ident: Ident, input: &mut Peekable<IntoIter>) -> TokenStream {
         quote! {
             expr::Expression::create_constant(expr::Constant::#ident)
         }
-    } else if literals::MAPS.contains(&ident.to_string().as_str()) {
+    } else if ::expr::maps::MAPS.contains(&ident.to_string().as_str()) {
         if let Some(TokenTree::Group(group)) = input.peek() {
             let mut group = group.stream().into_iter().peekable();
             input.next();
@@ -278,16 +274,14 @@ fn parse_ident(ident: Ident, input: &mut Peekable<IntoIter>) -> TokenStream {
             quote! {
                 expr::Expression::new(vec![#expr], expr::Action::Map {
                     name: String::from(#name),
-                    map: &|e, p| e.#ident(p, #extra_args)
+                    map: &|e, p| #ident(e, p, #extra_args)
                 })
             }
         } else {
             panic!("Expected group")
         }
     } else {
-        quote! {
-            #ident.clone()
-        }
+        ident.to_token_stream()
     }
 }
 

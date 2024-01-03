@@ -4,7 +4,9 @@ use crate::Expression;
 
 pub trait Rule {
     fn apply(&self, expr: &Expression) -> Option<Expression>;
-    fn name(&self) -> &str { "Unnamed rule" }
+    fn name(&self) -> &str {
+        "Unnamed rule"
+    }
 }
 
 impl std::fmt::Debug for dyn Rule {
