@@ -3,7 +3,7 @@ extern crate proc_macro;
 
 use std::iter::Peekable;
 
-use expr::literals;
+use expr::literals::{FUNCTIONS, CONSTANTS, maps::MAPS, predicates::PREDICATES};
 use proc_macro2::{token_stream::IntoIter, Group, Ident, TokenStream, TokenTree};
 use quote::{quote, ToTokens};
 
@@ -31,7 +31,7 @@ pub fn symb(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     for symbol in symbols {
         let s = symbol.to_string();
         output.extend(quote! {
-            let #symbol = expr::Expression::create_variable(#s);
+            let #symbol = ::expr::Expression::create_variable(#s);
         });
     }
 
@@ -65,7 +65,7 @@ fn parse_expr(input: &mut Peekable<IntoIter>, expect_group: bool) -> TokenStream
             if punct.as_char() == '-' {
                 if let Some(TokenTree::Literal(literal)) = input.peek() {
                     let output = quote! {
-                        expr::Expression::create_value(-#literal)
+                        ::expr::Expression::create_value(-#literal)
                     };
                     input.next();
                     return output;
@@ -73,11 +73,11 @@ fn parse_expr(input: &mut Peekable<IntoIter>, expect_group: bool) -> TokenStream
             }
 
             let action = match punct.as_char() {
-                '+' => quote! { expr::Action::Add },
-                '-' => quote! { expr::Action::Sub },
-                '*' => quote! { expr::Action::Mul },
-                '/' => quote! { expr::Action::Div },
-                '^' => quote! { expr::Action::Pow },
+                '+' => quote! { ::expr::Action::Add },
+                '-' => quote! { ::expr::Action::Sub },
+                '*' => quote! { ::expr::Action::Mul },
+                '/' => quote! { ::expr::Action::Div },
+                '^' => quote! { ::expr::Action::Pow },
                 c => panic!("Unexpected operator '{}'", c),
             };
 
@@ -87,11 +87,11 @@ fn parse_expr(input: &mut Peekable<IntoIter>, expect_group: bool) -> TokenStream
             }
 
             quote! {
-                expr::Expression::new(#children, #action)
+                ::expr::Expression::new(#children, #action)
             }
         }
         TokenTree::Literal(literal) => quote! {
-            expr::Expression::create_value(#literal)
+            ::expr::Expression::create_value(#literal)
         },
     }
 }
@@ -166,8 +166,8 @@ fn parse_pattern(input: &mut Peekable<IntoIter>) -> TokenStream {
 
     if is_segment {
         quote! {
-            expr::Expression::new_empty(
-                expr::Action::Segment {
+            ::expr::Expression::new_empty(
+                ::expr::Action::Segment {
                     name: String::from(#name),
                     matcher: #matcher,
                     predicate: #predicate
@@ -176,8 +176,8 @@ fn parse_pattern(input: &mut Peekable<IntoIter>) -> TokenStream {
         }
     } else {
         quote! {
-            expr::Expression::new_empty(
-                expr::Action::Slot {
+            ::expr::Expression::new_empty(
+                ::expr::Action::Slot {
                     name: String::from(#name),
                     matcher: #matcher,
                     predicate: #predicate
@@ -227,7 +227,11 @@ fn parse_predicate(input: &mut Peekable<IntoIter>) -> TokenStream {
     }
 
     if let TokenTree::Ident(ident) = token {
-        predicate.extend(quote! { #ident(e) });
+        if PREDICATES.contains(&ident.to_string().as_str()) {
+            predicate.extend(quote! { ::expr::literals::predicates::#ident(e) });
+        } else {
+            predicate.extend(quote! { #ident(e) });
+        }
     } else {
         panic!("Expected identifier after ':'")
     }
@@ -236,16 +240,16 @@ fn parse_predicate(input: &mut Peekable<IntoIter>) -> TokenStream {
 }
 
 fn parse_ident(ident: Ident, input: &mut Peekable<IntoIter>) -> TokenStream {
-    if literals::FUNCTIONS.contains(&ident.to_string().as_str()) {
+    if FUNCTIONS.contains(&ident.to_string().as_str()) {
         let children = parse_expr(input, true);
         quote! {
-            expr::Expression::create_function(expr::Function::#ident, #children)
+            ::expr::Expression::create_function(expr::Function::#ident, #children)
         }
-    } else if literals::CONSTANTS.contains(&ident.to_string().as_str()) {
+    } else if CONSTANTS.contains(&ident.to_string().as_str()) {
         quote! {
-            expr::Expression::create_constant(expr::Constant::#ident)
+            ::expr::Expression::create_constant(expr::Constant::#ident)
         }
-    } else if ::expr::maps::MAPS.contains(&ident.to_string().as_str()) {
+    } else if MAPS.contains(&ident.to_string().as_str()) {
         if let Some(TokenTree::Group(group)) = input.peek() {
             let mut group = group.stream().into_iter().peekable();
             input.next();
@@ -272,9 +276,9 @@ fn parse_ident(ident: Ident, input: &mut Peekable<IntoIter>) -> TokenStream {
 
             let name = ident.to_string();
             quote! {
-                expr::Expression::new(vec![#expr], expr::Action::Map {
+                ::expr::Expression::new(vec![#expr], ::expr::Action::Map {
                     name: String::from(#name),
-                    map: &|e, p| #ident(e, p, #extra_args)
+                    map: &|e, p| ::expr::literals::maps::#ident(e, p, #extra_args)
                 })
             }
         } else {
@@ -334,6 +338,6 @@ pub fn rule(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let replacement = parse_expr(&mut input, false);
 
     proc_macro::TokenStream::from(quote! {
-        &expr::MatchRule::new(#name, #pattern, #replacement)
+        &::expr::MatchRule::new(#name, #pattern, #replacement)
     })
 }
