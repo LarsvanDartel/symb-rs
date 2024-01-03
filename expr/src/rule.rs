@@ -54,6 +54,6 @@ impl Rule for MatchRule {
 
 impl std::fmt::Debug for MatchRule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} => {}", self.pattern, self.replacement)
+        write!(f, "{}: {} => {}", self.name, self.pattern, self.replacement)
     }
 }

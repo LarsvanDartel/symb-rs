@@ -99,7 +99,7 @@ fn parse_expr(input: &mut Peekable<IntoIter>, expect_group: bool) -> TokenStream
 fn eat(punct: char, input: &mut Peekable<IntoIter>) {
     let token = input
         .next()
-        .expect(format!("Expected '{}'", punct).as_str());
+        .unwrap_or_else(|| panic!("Expected '{}'", punct));
     if let TokenTree::Punct(p) = token {
         if p.as_char() != punct {
             panic!("Expected '{}', found '{}'", punct, p.as_char())
@@ -199,7 +199,7 @@ fn parse_predicate(input: &mut Peekable<IntoIter>) -> TokenStream {
     if let TokenTree::Group(group) = token {
         let mut group = group.stream().into_iter().peekable();
         let mut i = 0;
-        while let Some(_) = group.peek() {
+        while group.peek().is_some() {
             if i > 0 {
                 predicate.extend(quote! { && });
             }
@@ -255,9 +255,9 @@ fn parse_ident(ident: Ident, input: &mut Peekable<IntoIter>) -> TokenStream {
             input.next();
 
             let expr = parse_expr(&mut group, false);
-            
+
             let mut extra_args = TokenStream::new();
-            
+
             if group.peek().is_some() {
                 eat(',', &mut group);
                 let mut i = 0;
@@ -340,6 +340,6 @@ pub fn rule(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let replacement = parse_expr(&mut input, false);
 
     proc_macro::TokenStream::from(quote! {
-        Box::new(expr::rule::MatchRule::new(#name, #pattern, #replacement))
+        &expr::MatchRule::new(#name, #pattern, #replacement)
     })
 }

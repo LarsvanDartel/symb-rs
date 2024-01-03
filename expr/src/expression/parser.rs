@@ -18,7 +18,7 @@ type ParseResult<'a, T> = IResult<&'a str, T>;
 
 #[derive(Debug, Clone, PartialEq)]
 enum TokenType {
-    EOF,
+    EndOfFile,
     Error,
     Number,
     Variable,
@@ -75,7 +75,7 @@ impl Token {
         alt((
             separated_pair(digit0, tag("."), digit1)
                 .map(|(a, b)| Token::new(TokenType::Number, format!("{}.{}", a, b))),
-            separated_pair(digit0, tag("/"), digit1)
+            separated_pair(digit1, tag("/"), digit1)
                 .map(|(a, b)| Token::new(TokenType::Number, format!("{}/{}", a, b))),
             digit1.map(|a: &str| Token::new(TokenType::Number, a)),
         ))
@@ -157,7 +157,7 @@ impl Parser {
             }
         }
         if let Some(token) = &self.current_token {
-            if token.token != TokenType::EOF {
+            if token.token != TokenType::EndOfFile {
                 return Err(format!(
                     "Expected EOF, found {:?}",
                     self.current_token.clone().unwrap()
@@ -223,7 +223,7 @@ impl Parser {
 
     fn parse_primary(&mut self) -> Result<Expression, String> {
         if self.current_token.is_none() {
-            return Err(format!("Expected primary, found None"));
+            Err("Expected primary, found None")?;
         }
         let token = self.current_token.clone().unwrap();
 
@@ -243,7 +243,7 @@ impl Parser {
                 let mut args = Vec::new();
                 let left_paren = self.eat(TokenType::LeftParenthesis)?;
                 args.push(self.parse_expression()?);
-                while let Ok(_) = self.eat(TokenType::Comma) {
+                while self.eat(TokenType::Comma).is_ok() {
                     args.push(self.parse_expression()?);
                 }
                 let right_paren = self.eat(TokenType::RightParenthesis)?;
@@ -263,6 +263,14 @@ impl Parser {
             }
             TokenType::Sub => {
                 self.eat(TokenType::Sub)?;
+                if let Some(token) = &self.current_token {
+                    if token.token == TokenType::Number {
+                        let cur = self.eat(TokenType::Number)?;
+                        return Ok(Expression::create_value(
+                            Number::from_str(&format!("-{}", cur.lexeme.unwrap())).unwrap(),
+                        ));
+                    }
+                }
                 Ok(-self.parse_primary()?)
             }
             TokenType::Error => Err(token.lexeme.unwrap()),
@@ -295,7 +303,7 @@ impl Parser {
 
     fn next_token(&mut self) -> Result<Token, String> {
         if self.text.trim().is_empty() {
-            return Ok(Token::from(TokenType::EOF));
+            return Ok(Token::from(TokenType::EndOfFile));
         }
 
         let text = self.text.clone();

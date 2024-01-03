@@ -5,17 +5,27 @@ use crate::Constant;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Number {
     /// Integer
-    Int(i32),
+    Int(i64),
 
     /// Rational
-    Rational(i32, i32),
+    Rational(i64, i64),
 
     /// Float
     Real(f64),
 }
 
-impl From<i32> for Number {
-    fn from(int: i32) -> Self {
+impl Number {
+    pub fn inverse(self) -> Self {
+        match self {
+            Number::Int(int) => Number::Rational(1, int),
+            Number::Rational(num, den) => Number::Rational(den, num),
+            Number::Real(real) => Number::Real(1.0 / real),
+        }
+    }
+}
+
+impl From<i64> for Number {
+    fn from(int: i64) -> Self {
         Number::Int(int)
     }
 }
@@ -26,8 +36,8 @@ impl From<f64> for Number {
     }
 }
 
-impl From<(i32, i32)> for Number {
-    fn from(rational: (i32, i32)) -> Self {
+impl From<(i64, i64)> for Number {
+    fn from(rational: (i64, i64)) -> Self {
         Number::Rational(rational.0, rational.1)
     }
 }
@@ -38,18 +48,18 @@ impl FromStr for Number {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.contains('/') {
             let mut parts = s.split('/');
-            let num = parts.next().unwrap().parse::<i32>()?;
-            let den = parts.next().unwrap().parse::<i32>()?;
+            let num = parts.next().unwrap().parse::<i64>()?;
+            let den = parts.next().unwrap().parse::<i64>()?;
             Ok(Number::Rational(num, den))
         } else if s.contains('.') {
             let mut parts = s.split('.');
-            let int = parts.next().unwrap().parse::<i32>()?;
+            let int = parts.next().unwrap().parse::<i64>()?;
             let dec = parts.next().unwrap();
-            let den = 10i32.pow(dec.len() as u32);
-            let dec = dec.parse::<i32>()?;
+            let den = 10i64.pow(dec.len() as u32);
+            let dec = dec.parse::<i64>()?;
             Ok(Number::Rational(int * den + dec, den))
         } else {
-            Ok(Number::Int(s.parse::<i32>()?))
+            Ok(Number::Int(s.parse::<i64>()?))
         }
     }
 }
@@ -84,7 +94,9 @@ impl std::ops::Add for Number {
             (Number::Int(a), Number::Rational(b, c)) => Number::Rational(a * c + b, c),
             (Number::Int(a), Number::Real(b)) => Number::Real(a as f64 + b),
             (Number::Rational(a, b), Number::Int(c)) => Number::Rational(a + b * c, b),
-            (Number::Rational(a, b), Number::Rational(c, d)) => Number::Rational(a * d + b * c, b * d),
+            (Number::Rational(a, b), Number::Rational(c, d)) => {
+                Number::Rational(a * d + b * c, b * d)
+            }
             (Number::Rational(a, b), Number::Real(c)) => Number::Real(a as f64 / b as f64 + c),
             (Number::Real(a), Number::Int(b)) => Number::Real(a + b as f64),
             (Number::Real(a), Number::Rational(b, c)) => Number::Real(a + b as f64 / c as f64),
@@ -137,7 +149,7 @@ impl std::cmp::PartialOrd for Number {
 
 impl std::fmt::Display for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.clone() {
+        match *self {
             Number::Int(int) => f.write_str(&int.to_string()),
             Number::Rational(num, den) => f.write_str(&format!("({}/{})", num, den)),
             Number::Real(real) => f.write_str(&real.to_string()),

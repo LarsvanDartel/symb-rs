@@ -1,4 +1,5 @@
 mod expression;
-pub mod rule;
+mod rule;
 
 pub use expression::*;
+pub use rule::*;

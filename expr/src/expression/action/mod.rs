@@ -139,9 +139,7 @@ impl Clone for Action {
             Self::Pow => Self::Pow,
             Self::Equals => Self::Equals,
             Self::Var { name } => Self::Var { name: name.clone() },
-            Self::Num { value } => Self::Num {
-                value: value.clone(),
-            },
+            Self::Num { value } => Self::Num { value: *value },
             Self::Fun(arg0) => Self::Fun(arg0.clone()),
             Self::Const(arg0) => Self::Const(arg0.clone()),
             Self::Err(arg0) => Self::Err(arg0.clone()),
