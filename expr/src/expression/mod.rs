@@ -7,7 +7,7 @@ pub use literals::{maps, predicates};
 use parser::Parser;
 use std::{collections::HashMap, str::FromStr};
 
-use crate::Rule;
+use crate::{Rule, RuleSet};
 
 #[derive(Clone)]
 pub struct Expression {
@@ -318,12 +318,12 @@ impl Expression {
 
 /// Applying rules to expressions
 impl Expression {
-    pub fn apply_ruleset(&self, rules: &[&dyn Rule], print: bool) -> Expression {
+    pub fn apply_ruleset<R: RuleSet>(&self, ruleset: &R, print: bool) -> Expression {
         let mut expr = self.clone();
         loop {
             let mut applied = false;
-            for rule in rules {
-                if let Some(new_expr) = expr.apply_rule(*rule) {
+            for rule in ruleset.rules() {
+                if let Some(new_expr) = expr.apply_rule(rule) {
                     if print {
                         println!("{}: {} = {}", rule.name(), expr, new_expr);
                     }

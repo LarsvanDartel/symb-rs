@@ -338,6 +338,6 @@ pub fn rule(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let replacement = parse_expr(&mut input, false);
 
     proc_macro::TokenStream::from(quote! {
-        &::expr::MatchRule::new(#name, #pattern, #replacement)
+        Box::new(::expr::MatchRule::new(#name, #pattern, #replacement))
     })
 }

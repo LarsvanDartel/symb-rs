@@ -15,6 +15,10 @@ impl std::fmt::Debug for dyn Rule {
     }
 }
 
+pub trait RuleSet {
+    fn rules(&self) -> impl Iterator<Item = &dyn Rule>;
+}
+
 pub struct MatchRule {
     name: String,
     pattern: Expression,
