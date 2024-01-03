@@ -163,7 +163,7 @@ pub mod maps {
                     unreachable!()
                 };
                 for c in &e.children {
-                    assert!(is_number(e));
+                    assert!(is_number(c));
                     if let Action::Num { value } = c.action {
                         res = match action {
                             Action::Add => res + value,
