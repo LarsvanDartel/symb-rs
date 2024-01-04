@@ -16,7 +16,7 @@ impl expr::RuleSet for RuleSet {
 enum Rules {
     Cleanup,
     Form,
-    Expand,
+    FullExpand,
     Addition,
     Multiplication,
     Division,
@@ -72,7 +72,7 @@ impl Rules {
                 rule!("distributivity power", ^(*(~~a), ~b:(is_integer,!is_one,!is_zero)) => distribute(~~a, ~b, ^)),
                 rule!("combine powers", ^(^(~a, ~b:(!is_one)), ~c) => ^(~a, *(~b, ~c))),
             ]),
-            Self::Expand => Self::create_rulesets(&[
+            Self::FullExpand => Self::create_rulesets(&[
                 Self::Form,
                 Self::Addition,
                 Self::Multiplication,
@@ -90,7 +90,7 @@ impl Rules {
                 rule!("unit circle sin", Sin(*(2/3, Pi)) => *(1/2, Sqrt(3))),
                 rule!("unit circle sin", Sin(*(3/4, Pi)) => *(1/2, Sqrt(2))),
                 rule!("unit circle sin", Sin(*(5/6, Pi)) => 1/2),
-                rule!("unit circle sin", Sin(*(1, Pi)) => 0),
+                rule!("unit circle sin", Sin(Pi) => 0),
                 rule!("unit circle sin", Sin(*(7/6, Pi)) => -1/2),
                 rule!("unit circle sin", Sin(*(5/4, Pi)) => *(-1/2, Sqrt(2))),
                 rule!("unit circle sin", Sin(*(4/3, Pi)) => *(-1/2, Sqrt(3))),
@@ -108,7 +108,7 @@ impl Rules {
                 rule!("unit circle cos", Cos(*(2/3, Pi)) => -1/2),
                 rule!("unit circle cos", Cos(*(3/4, Pi)) => *(-1/2, Sqrt(2))),
                 rule!("unit circle cos", Cos(*(5/6, Pi)) => *(-1/2, Sqrt(3))),
-                rule!("unit circle cos", Cos(*(1, Pi)) => -1),
+                rule!("unit circle cos", Cos(Pi) => -1),
                 rule!("unit circle cos", Cos(*(7/6, Pi)) => *(-1/2, Sqrt(3))),
                 rule!("unit circle cos", Cos(*(5/4, Pi)) => *(-1/2, Sqrt(2))),
                 rule!("unit circle cos", Cos(*(4/3, Pi)) => -1/2),
@@ -123,7 +123,7 @@ impl Rules {
                 rule!("unit circle tan", Tan(*(1/4, Pi)) => 1),
                 rule!("unit circle tan", Tan(*(1/3, Pi)) => Sqrt(3)),
                 rule!("unit circle tan", Tan(*(1/2, Pi)) => Error("undefined")),
-                rule!("unit circle tan", Tan(*(2/3, Pi)) => *(-1/3, Sqrt(3))),
+                rule!("unit circle tan", Tan(*(2/3, Pi)) => *(-1, Sqrt(3))),
                 rule!("unit circle tan", Tan(*(3/4, Pi)) => -1),
                 rule!("unit circle tan", Tan(*(5/6, Pi)) => *(-1/3, Sqrt(3))),
                 rule!("periodicity tan", Tan(Pi) => Tan(0)),
@@ -136,7 +136,7 @@ impl Rules {
 
 fn main() {
     let cleanup_ruleset = Rules::Cleanup.create_ruleset();
-    let expand_ruleset = Rules::Expand.create_ruleset();
+    let expand_ruleset = Rules::FullExpand.create_ruleset();
     loop {
         print!("calc > ");
         std::io::stdout().flush().unwrap();
