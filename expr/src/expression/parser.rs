@@ -75,8 +75,6 @@ impl Token {
         alt((
             separated_pair(digit0, tag("."), digit1)
                 .map(|(a, b)| Token::new(TokenType::Number, format!("{}.{}", a, b))),
-            separated_pair(digit1, tag("/"), digit1)
-                .map(|(a, b)| Token::new(TokenType::Number, format!("{}/{}", a, b))),
             digit1.map(|a: &str| Token::new(TokenType::Number, a)),
         ))
         .parse(input)

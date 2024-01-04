@@ -103,6 +103,30 @@ pub mod predicates {
             )
         }
 
+        pub fn is_even(e: &Expression) -> bool {
+            if let Action::Num { value } = e.action {
+                if let Number::Int(i) = value {
+                    i.is_even()
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }
+
+        pub fn is_odd(e: &Expression) -> bool {
+            if let Action::Num { value } = e.action {
+                if let Number::Int(i) = value {
+                    i.is_odd()
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }
+
         pub fn is_positive(e: &Expression) -> bool {
             matches!(e.action, Action::Num { value } if value > Number::Int(0))
         }
@@ -152,8 +176,8 @@ pub mod predicates {
 pub mod maps {
     use super::predicates::{is_integer, is_number, is_one, is_zero};
     use crate::{Action, Expression, Number};
-    use std::collections::HashMap;
     use num_integer::Integer;
+    use std::collections::HashMap;
 
     macro_rules! make_maps {
         {$(pub fn $map_name:ident ($ex:ident: &Expression, $map:tt: &HashMap<String, Expression> $(, $param:ident: $param_type:ty)*) -> Expression $body:block)*} => {
@@ -236,6 +260,16 @@ pub mod maps {
                 }
             } else {
                 panic!("Expected rational number, got {:?}", e);
+            }
+        }
+
+        pub fn create_rational(num: &Expression, patterns: &HashMap<String, Expression>, den: Expression) -> Expression {
+            let den = den.substitute_pattern(patterns);
+            match (&num.action, &den.action) {
+                (Action::Num { value: Number::Int(num) }, Action::Num { value: Number::Int(den) }) => {
+                    Expression::create_value(Number::Rational(*num, *den))
+                },
+                _ => panic!("Cannot create rational from {:?} and {:?}", num, den)
             }
         }
 

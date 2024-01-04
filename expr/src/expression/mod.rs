@@ -161,31 +161,29 @@ impl Expression {
             return false;
         }
 
-        for i in 0..self_patterns.len() {
-            let p = &self.children[self_patterns[i]];
-            if let Action::Slot { .. } = p.action {
+        for (i, p) in self_patterns.iter().enumerate() {
+            let p = &self.children[*p];
+            let matched = if let Action::Slot { .. } = p.action {
                 if possible_matches[i].len() > 1 {
                     return false;
                 }
-                if possible_matches[i].is_empty() {
-                    return p.matches(&Expression::new_empty(other.action.clone()), patterns);
-                }
-                let j = possible_matches[i][0];
-                if !p.matches(&other.children[j], patterns) {
-                    return false;
-                }
+                possible_matches[i]
+                    .get(0)
+                    .map(|&j| other.children[j].clone())
+                    .unwrap_or(Expression::new_empty(other.action.clone()))
             } else if let Action::Segment { .. } = p.action {
-                let matched = Expression::new(
+                Expression::new(
                     possible_matches[i]
                         .iter()
                         .map(|&j| other.children[j].clone())
                         .collect(),
                     other.action.clone(),
-                );
-
-                if !p.matches(&matched, patterns) {
-                    return false;
-                }
+                )
+            } else {
+                unreachable!()
+            };
+            if !p.matches(&matched, patterns) {
+                return false;
             }
         }
 
@@ -308,6 +306,11 @@ impl Expression {
                         children.extend(c.substitute_pattern(patterns).children);
                     } else {
                         children.push(c.substitute_pattern(patterns));
+                    }
+                }
+                if let Action::Add | Action::Mul = self.action {
+                    if children.len() == 0 {
+                        return self.action.identity();
                     }
                 }
                 Expression::new(children, self.action.clone())

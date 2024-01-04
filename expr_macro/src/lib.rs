@@ -3,8 +3,8 @@ extern crate proc_macro;
 
 use std::iter::Peekable;
 
-use expr::literals::{FUNCTIONS, CONSTANTS, maps::MAPS, predicates::PREDICATES};
-use proc_macro2::{token_stream::IntoIter, Group, Ident, TokenStream, TokenTree};
+use expr::literals::{maps::MAPS, predicates::PREDICATES, CONSTANTS, FUNCTIONS};
+use proc_macro2::{token_stream::IntoIter, Group, Ident, TokenStream, TokenTree, Literal};
 use quote::{quote, ToTokens};
 
 #[proc_macro]
@@ -63,12 +63,12 @@ fn parse_expr(input: &mut Peekable<IntoIter>, expect_group: bool) -> TokenStream
             }
 
             if punct.as_char() == '-' {
-                if let Some(TokenTree::Literal(literal)) = input.peek() {
-                    let output = quote! {
-                        ::expr::Expression::create_value(-#literal)
+                if let Some(TokenTree::Literal(_)) = input.peek() {
+                    let literal = match input.next().unwrap() {
+                        TokenTree::Literal(literal) => literal,
+                        _ => unreachable!(),
                     };
-                    input.next();
-                    return output;
+                    return parse_literal(literal, input, true);
                 }
             }
 
@@ -90,9 +90,7 @@ fn parse_expr(input: &mut Peekable<IntoIter>, expect_group: bool) -> TokenStream
                 ::expr::Expression::new(#children, #action)
             }
         }
-        TokenTree::Literal(literal) => quote! {
-            ::expr::Expression::create_value(#literal)
-        },
+        TokenTree::Literal(literal) => parse_literal(literal, input, false),
     }
 }
 
@@ -240,7 +238,20 @@ fn parse_predicate(input: &mut Peekable<IntoIter>) -> TokenStream {
 }
 
 fn parse_ident(ident: Ident, input: &mut Peekable<IntoIter>) -> TokenStream {
-    if FUNCTIONS.contains(&ident.to_string().as_str()) {
+    if ident.to_string() == "Error" {
+        if let Some(TokenTree::Group(group)) = input.next() {
+            let group = group.stream().into_iter();
+            if let Some(TokenTree::Literal(literal)) = group.into_iter().next() {
+                return quote! {
+                    ::expr::Expression::create_error(#literal)
+                };
+            } else {
+                panic!("Expected literal after 'Error'")
+            }
+        } else {
+            panic!("Expected group after 'Error'")
+        }
+    } else if FUNCTIONS.contains(&ident.to_string().as_str()) {
         let children = parse_expr(input, true);
         quote! {
             ::expr::Expression::create_function(expr::Function::#ident, #children)
@@ -302,6 +313,34 @@ fn parse_group(group: Group) -> TokenStream {
 
     quote! {
         vec![#(#children),*]
+    }
+}
+
+fn parse_literal(literal: Literal, input: &mut Peekable<IntoIter>,negative: bool) -> TokenStream {
+    let literal = if negative {
+        quote! { -#literal }
+    } else {
+        quote! { #literal }
+    };
+    if let Some(TokenTree::Punct(punct)) = input.peek() {
+        if punct.as_char() == '/' {
+            input.next();
+            let denominator = input
+                .next()
+                .expect("Expected denominator after '/'");
+            if let TokenTree::Literal(denominator) = denominator {
+                return quote! {
+                    ::expr::Expression::new(vec![], ::expr::Action::Num {
+                        value: ::expr::Number::Rational(#literal, #denominator)
+                    })
+                };
+            } else {
+                panic!("Expected denominator after '/'")
+            }
+        }
+    }
+    quote! {
+        ::expr::Expression::create_value(#literal)
     }
 }
 

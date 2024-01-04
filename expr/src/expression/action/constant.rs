@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::literals;
+use crate::{literals, Number};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Constant {
@@ -32,6 +32,15 @@ impl From<&str> for Constant {
 impl From<String> for Constant {
     fn from(string: String) -> Self {
         Constant::from(string.as_str())
+    }
+}
+
+impl From<Constant> for Number {
+    fn from(constant: Constant) -> Self {
+        match constant {
+            Constant::Pi => Number::Real(std::f64::consts::PI),
+            Constant::E => Number::Real(std::f64::consts::E),
+        }
     }
 }
 

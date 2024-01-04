@@ -1,7 +1,5 @@
 use std::str::FromStr;
 
-use crate::Constant;
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Number {
     /// Integer
@@ -46,12 +44,7 @@ impl FromStr for Number {
     type Err = std::num::ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.contains('/') {
-            let mut parts = s.split('/');
-            let num = parts.next().unwrap().parse::<i64>()?;
-            let den = parts.next().unwrap().parse::<i64>()?;
-            Ok(Number::Rational(num, den))
-        } else if s.contains('.') {
+        if s.contains('.') {
             let mut parts = s.split('.');
             let int = parts.next().unwrap().parse::<i64>()?;
             let dec = parts.next().unwrap();
@@ -73,15 +66,6 @@ impl From<&str> for Number {
 impl From<String> for Number {
     fn from(string: String) -> Self {
         Number::from(string.as_str())
-    }
-}
-
-impl From<Constant> for Number {
-    fn from(constant: Constant) -> Self {
-        match constant {
-            Constant::Pi => Number::Real(std::f64::consts::PI),
-            Constant::E => Number::Real(std::f64::consts::E),
-        }
     }
 }
 
