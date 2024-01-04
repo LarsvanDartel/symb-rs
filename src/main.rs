@@ -27,7 +27,12 @@ enum Rules {
 
 impl Rules {
     fn create_rulesets(sets: &[Self]) -> RuleSet {
-        RuleSet(sets.iter().map(|s| s.create_ruleset()).flat_map(|s| s.0).collect())
+        RuleSet(
+            sets.iter()
+                .map(|s| s.create_ruleset())
+                .flat_map(|s| s.0)
+                .collect(),
+        )
     }
     fn create_ruleset(&self) -> RuleSet {
         match self {
@@ -45,6 +50,7 @@ impl Rules {
                 rule!("collapse addition", +(~a) => ~a),
                 rule!("numeric addition", +(~~a:is_number:can_reduce, ~~b:!is_number) => +(reduce(~~a, +), ~~b)),
                 rule!("identity addition", +(~~a:!is_zero:!is_empty, ~~b:is_zero:!is_empty) => ~~a),
+                rule!("combine addition", +(~~a::can_combine) => combine(~~a, +)),
             ]),
             Self::Multiplication => RuleSet(vec![
                 rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b)),
@@ -53,6 +59,7 @@ impl Rules {
                 rule!("identity multiplication", *(~~a:!is_one:!is_empty, ~~b:is_one:!is_empty) => ~~a),
                 rule!("absorber multiplication", *(~~a::!is_empty, 0) => 0),
                 rule!("distributivity multiplication", *(~~a::!is_empty, +(~~b)) => distribute(~~b, ~~a, *)),
+                rule!("combine multiplication", *(~~a::can_combine) => combine(~~a, *)),
             ]),
             Self::Division => RuleSet(vec![
                 rule!("rational simplification", ~a:is_rational_reducible => rational_reduce(~a)),

@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Number {
@@ -137,6 +138,19 @@ impl std::fmt::Display for Number {
             Number::Int(int) => f.write_str(&int.to_string()),
             Number::Rational(num, den) => f.write_str(&format!("({}/{})", num, den)),
             Number::Real(real) => f.write_str(&real.to_string()),
+        }
+    }
+}
+
+impl Hash for Number {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Number::Int(int) => int.hash(state),
+            Number::Rational(num, den) => {
+                num.hash(state);
+                den.hash(state);
+            }
+            Number::Real(real) => real.to_bits().hash(state),
         }
     }
 }

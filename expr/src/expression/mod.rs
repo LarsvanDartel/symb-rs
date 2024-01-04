@@ -9,7 +9,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use crate::{Rule, RuleSet};
 
-#[derive(Clone)]
+#[derive(Clone, Hash)]
 pub struct Expression {
     children: Vec<Expression>,
     action: Action,
@@ -464,9 +464,45 @@ impl std::ops::Neg for Expression {
 
 impl PartialEq for Expression {
     fn eq(&self, other: &Self) -> bool {
-        self.matches(other, &mut HashMap::new())
+        if let (Action::Add, Action::Add) | (Action::Mul, Action::Mul) = (&self.action, &other.action) {
+            let mut matched = vec![false; other.children.len()];
+            for c1 in &self.children {
+                let mut found = false;
+                for (i, c2) in other.children.iter().enumerate() {
+                    if matched[i] {
+                        continue;
+                    }
+                    if c1 == c2 {
+                        matched[i] = true;
+                        found = true;
+                        break;
+                    }
+                }
+                if !found {
+                    return false;
+                }
+            }
+            return matched.iter().all(|&b| b);
+        }
+
+        if self.action != other.action {
+            return false;
+        }
+
+        if self.children.len() != other.children.len() {
+            return false;
+        }
+
+        for i in 0..self.children.len() {
+            if self.children[i] != other.children[i] {
+                return false;
+            }
+        }
+        true
     }
 }
+
+impl Eq for Expression {}
 
 impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

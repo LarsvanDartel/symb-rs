@@ -1,3 +1,5 @@
+use crate::{Action, Expression};
+
 pub const ADD: &str = "+";
 pub const SUB: &str = "-";
 pub const MUL: &str = "*";
@@ -46,7 +48,53 @@ pub const fn matching_parentheses(c: char) -> Option<char> {
     }
 }
 
+fn part(e: &Expression, action: &Action) -> (Option<Expression>, Option<Expression>) {
+    if let Action::Add = action {
+        if let Action::Mul = e.action {
+            let mut p1 = vec![];
+            let mut p2 = vec![];
+            for c in &e.children {
+                if predicates::is_number(c) {
+                    p2.push(c.clone());
+                } else {
+                    p1.push(c.clone());
+                }
+            }
+            let p1 = if p1.is_empty() {
+                None
+            } else if p1.len() == 1 {
+                Some(p1[0].clone())
+            } else {
+                Some(Expression::new(p1, Action::Mul))
+            };
+            let p2 = if p2.is_empty() {
+                None
+            } else if p2.len() == 1 {
+                Some(p2[0].clone())
+            } else {
+                Some(Expression::new(p2, Action::Mul))
+            };
+            (p1, p2)
+        } else {
+            if predicates::is_number(e) {
+                (None, Some(e.clone()))
+            } else {
+                (Some(e.clone()), None)
+            }
+        }
+    } else if let Action::Mul = action {
+        if let Action::Pow = e.action {
+            (Some(e.children[0].clone()), Some(e.children[1].clone()))
+        } else {
+            (Some(e.clone()), None)
+        }
+    } else {
+        panic!("Invalid action {:?}", action);
+    }
+}
+
 pub mod predicates {
+    use super::part;
     use crate::{Action, Expression, Function, Number};
     use num_integer::Integer;
 
@@ -171,6 +219,25 @@ pub mod predicates {
             }
         }
 
+        pub fn can_combine(e: &Expression) -> bool {
+            if let Action::Add | Action::Mul = e.action {
+                for (i, c1) in e.children.iter().enumerate() {
+                    let p1 = part(c1, &e.action).0;
+                    if p1.is_none() {
+                        continue;
+                    }
+                    for c2 in &e.children[i + 1..] {
+                        if p1 == part(c2, &e.action).0 {
+                            return true;
+                         }
+                    }
+                }
+                false
+            } else {
+                false
+            }
+        }
+
         pub fn is_derivative_independent(e: &Expression) -> bool {
             if let Action::Fun(Function::D) = e.action {
                 assert_eq!(e.children.len(), 2);
@@ -189,7 +256,7 @@ pub mod predicates {
 
 pub mod maps {
     use super::predicates::{is_integer, is_number, is_one, is_zero};
-    use crate::{Action, Expression, Function, Number};
+    use crate::{literals::part, Action, Expression, Function, Number};
     use num_integer::Integer;
     use std::collections::HashMap;
 
@@ -342,7 +409,11 @@ pub mod maps {
             }
         }
 
-        pub fn create_rational(num: &Expression, patterns: &HashMap<String, Expression>, den: Expression) -> Expression {
+        pub fn create_rational(
+            num: &Expression,
+            patterns: &HashMap<String, Expression>,
+            den: Expression
+        ) -> Expression {
             let den = den.substitute_pattern(patterns);
             match (&num.action, &den.action) {
                 (Action::Num { value: Number::Int(num) }, Action::Num { value: Number::Int(den) }) => {
@@ -383,6 +454,52 @@ pub mod maps {
                 )
             } else {
                 panic!("Cannot distribute {:?}", action);
+            }
+        }
+
+        pub fn combine(e: &Expression, _: &HashMap<String, Expression>, action: Action) -> Expression {
+            if let Action::Add | Action::Mul = action {
+                assert_eq!(e.action, action);
+                let mut cnt: HashMap<Expression, Vec<(usize, Option<Expression>)>>   = HashMap::new();
+                let mut res = vec![];
+                for (i, c) in e.children.iter().enumerate() {
+                    let p = part(c, &e.action);
+                    if p.0.is_none() {
+                        res.push(c.clone());
+                        continue;
+                    }
+                    let part = p.0.unwrap();
+                    let prev_part = cnt.keys().find(|p2| p2 == &&part);
+                    if let Some(prev_part) = prev_part {
+                        cnt.entry(prev_part.clone()).and_modify(|v| v.push((i, p.1)));
+                    } else {
+                        cnt.insert(part, vec![(i, p.1)]);
+                    }
+                }
+                for (p, indices) in cnt {
+                    if indices.len() == 1 {
+                        res.push(e.children[indices[0].0].clone());
+                        continue;
+                    }
+                    let mut c = vec![];
+                    for (_, p2) in &indices {
+                        if p2.is_none() {
+                            c.push(Action::Mul.identity());
+                        } else {
+                            c.push(p2.clone().unwrap());
+                        }
+                    }
+
+                    if let Action::Add = action {
+                        res.push(Expression::new_binary(Expression::new(c, Action::Add), p, Action::Mul));
+                    } else {
+                        res.push(Expression::new_binary(p, Expression::new(c, Action::Add), Action::Pow));
+                    }
+                }
+
+                Expression::new(res, e.action.clone())
+            } else {
+                panic!("Cannot combine {:?}", action);
             }
         }
     }

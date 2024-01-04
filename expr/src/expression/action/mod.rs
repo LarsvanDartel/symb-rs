@@ -2,7 +2,7 @@ mod constant;
 mod function;
 mod number;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::{Hash, Hasher}};
 
 use crate::{literals, Expression};
 pub use constant::Constant;
@@ -213,6 +213,51 @@ impl std::fmt::Debug for Action {
                 .field("name", name)
                 .finish_non_exhaustive(),
             Self::Map { name, .. } => write!(f, "{:?}", name),
+        }
+    }
+}
+
+impl Hash for Action {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Self::Add => state.write_u8(0),
+            Self::Sub => state.write_u8(1),
+            Self::Mul => state.write_u8(2),
+            Self::Div => state.write_u8(3),
+            Self::Pow => state.write_u8(4),
+            Self::Equals => state.write_u8(5),
+            Self::Var { name } => {
+                state.write_u8(6);
+                name.hash(state);
+            }
+            Self::Num { value } => {
+                state.write_u8(7);
+                value.hash(state);
+            }
+            Self::Fun(function) => {
+                state.write_u8(8);
+                function.hash(state);
+            }
+            Self::Const(constant) => {
+                state.write_u8(9);
+                constant.hash(state);
+            }
+            Self::Err(message) => {
+                state.write_u8(10);
+                message.hash(state);
+            }
+            Self::Slot { name, .. } => {
+                state.write_u8(11);
+                name.hash(state);
+            }
+            Self::Segment { name, .. } => {
+                state.write_u8(12);
+                name.hash(state);
+            }
+            Self::Map { name, .. } => {
+                state.write_u8(13);
+                name.hash(state);
+            }
         }
     }
 }

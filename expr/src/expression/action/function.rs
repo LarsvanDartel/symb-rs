@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::literals;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Function {
     /// Sine
     Sin,
