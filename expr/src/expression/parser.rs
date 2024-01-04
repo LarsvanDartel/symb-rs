@@ -9,6 +9,8 @@ use nom::{
 
 use std::str::FromStr;
 
+use crate::Function;
+
 use super::literals;
 use super::Action;
 use super::Expression;
@@ -246,7 +248,15 @@ impl Parser {
                 }
                 let right_paren = self.eat(TokenType::RightParenthesis)?;
                 Self::matching_parentheses(left_paren, right_paren)?;
-                Ok(Expression::create_function(fun.lexeme.unwrap(), args))
+                let fun = Function::from_str(&fun.lexeme.unwrap())?;
+                if fun.arity() != args.len() {
+                    Err(format!(
+                        "Expected {} arguments, found {}",
+                        fun.arity(),
+                        args.len()
+                    ))?;
+                }
+                Ok(Expression::create_function(fun, args))
             }
             TokenType::Constant => {
                 let c = self.eat(TokenType::Constant)?;
