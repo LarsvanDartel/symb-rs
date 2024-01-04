@@ -1,6 +1,7 @@
 extern crate expr;
 extern crate proc_macro;
 
+use core::panic;
 use std::iter::Peekable;
 
 use expr::literals::{maps::MAPS, predicates::PREDICATES, CONSTANTS, FUNCTIONS};
@@ -252,9 +253,15 @@ fn parse_ident(ident: Ident, input: &mut Peekable<IntoIter>) -> TokenStream {
             panic!("Expected group after 'Error'")
         }
     } else if FUNCTIONS.contains(&ident.to_string().as_str()) {
-        let children = parse_expr(input, true);
-        quote! {
-            ::expr::Expression::create_function(expr::Function::#ident, #children)
+        if let Some(TokenTree::Group(_)) = input.peek() {
+            let children = parse_expr(input, true);
+            quote! {
+                ::expr::Expression::create_function(expr::Function::#ident, #children)
+            }
+        } else {
+            quote! {
+                ::expr::Action::Fun ( ::expr::Function::#ident )
+            }
         }
     } else if CONSTANTS.contains(&ident.to_string().as_str()) {
         quote! {

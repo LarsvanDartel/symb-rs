@@ -29,7 +29,7 @@ pub enum Function {
     Log,
 
     /// Derivative
-    Diff,
+    D,
 
     /// Integral
     Int,
@@ -42,7 +42,7 @@ impl Function {
     pub fn arity(&self) -> usize {
         match self.clone() {
             Function::Root | Function::Log => 2,
-            Function::Diff | Function::Int => 2,
+            Function::D | Function::Int => 2,
             _ => 1,
         }
     }
@@ -61,7 +61,7 @@ impl FromStr for Function {
             literals::EXP => Ok(Function::Exp),
             literals::LN => Ok(Function::Ln),
             literals::LOG => Ok(Function::Log),
-            literals::DIFF => Ok(Function::Diff),
+            literals::DIFF => Ok(Function::D),
             literals::INT => Ok(Function::Int),
             literals::ABS => Ok(Function::Abs),
             _ => Err(format!("Unknown function: {}", s)),
@@ -92,7 +92,7 @@ impl std::fmt::Display for Function {
             Function::Exp => f.write_str(literals::EXP),
             Function::Ln => f.write_str(literals::LN),
             Function::Log => f.write_str(literals::LOG),
-            Function::Diff => f.write_str(literals::DIFF),
+            Function::D => f.write_str(literals::DIFF),
             Function::Int => f.write_str(literals::INT),
             Function::Abs => f.write_str(literals::ABS),
         }

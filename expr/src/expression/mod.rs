@@ -70,6 +70,13 @@ impl Expression {
         matches!(self.action, Action::Slot { .. } | Action::Segment { .. })
     }
 
+    pub(crate) fn has_variable(&self, var: &String) -> bool {
+        if let Action::Var { name } = &self.action {
+            return name == var;
+        }
+        self.children.iter().any(|c| c.has_variable(var))
+    }
+
     fn match_children_unordered(
         &self,
         other: &Self,
@@ -478,7 +485,9 @@ impl std::fmt::Display for Expression {
         } else {
             for i in 0..self.children.len() {
                 if i > 0 {
+                    f.write_str(" ")?;
                     f.write_str(&self.action.to_string())?;
+                    f.write_str(" ")?;
                 }
                 if self.children[i].action <= self.action {
                     f.write_str("(")?;

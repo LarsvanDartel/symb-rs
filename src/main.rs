@@ -21,6 +21,7 @@ enum Rules {
     Multiplication,
     Division,
     Powers,
+    Derivative,
     Trigonometry,
 }
 
@@ -42,13 +43,13 @@ impl Rules {
             Self::Addition => RuleSet(vec![
                 rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b)),
                 rule!("collapse addition", +(~a) => ~a),
-                rule!("numeric addition", +(~~a:is_number:can_combine, ~~b:!is_number) => +(reduce(~~a, +), ~~b)),
+                rule!("numeric addition", +(~~a:is_number:can_reduce, ~~b:!is_number) => +(reduce(~~a, +), ~~b)),
                 rule!("identity addition", +(~~a:!is_zero:!is_empty, ~~b:is_zero:!is_empty) => ~~a),
             ]),
             Self::Multiplication => RuleSet(vec![
                 rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b)),
                 rule!("collapse multiplication", *(~a) => ~a),
-                rule!("numeric multiplication", *(~~a:is_number:can_combine, ~~b:!is_number) => *(reduce(~~a, *), ~~b)),
+                rule!("numeric multiplication", *(~~a:is_number:can_reduce, ~~b:!is_number) => *(reduce(~~a, *), ~~b)),
                 rule!("identity multiplication", *(~~a:!is_one:!is_empty, ~~b:is_one:!is_empty) => ~~a),
                 rule!("absorber multiplication", *(~~a::!is_empty, 0) => 0),
                 rule!("distributivity multiplication", *(~~a::!is_empty, +(~~b)) => distribute(~~b, ~~a, *)),
@@ -72,13 +73,12 @@ impl Rules {
                 rule!("distributivity power", ^(*(~~a), ~b:(is_integer,!is_one,!is_zero)) => distribute(~~a, ~b, ^)),
                 rule!("combine powers", ^(^(~a, ~b:(!is_one)), ~c) => ^(~a, *(~b, ~c))),
             ]),
-            Self::FullExpand => Self::create_rulesets(&[
-                Self::Form,
-                Self::Addition,
-                Self::Multiplication,
-                Self::Division,
-                Self::Powers,
-                Self::Trigonometry,
+            Self::Derivative => RuleSet(vec![
+                rule!("indepence", ~a::is_derivative_independent => 0),
+                rule!("identity", D(~x, ~x) => 1),
+                rule!("linearity", D(*(~~a:is_value:!is_empty, ~~b::!is_empty), ~x) => *(~~a, D(~~b, ~x))),
+                rule!("additivity", D(+(~~a), ~x) => reduce(D(+(~~a), ~x), D)),
+                rule!("multiplicativity", D(*(~~a::can_reduce), ~x) => reduce(D(*(~~a), ~x), D)),
             ]),
             Self::Trigonometry => RuleSet(vec![
                 // Trigonometry
@@ -129,7 +129,16 @@ impl Rules {
                 rule!("periodicity tan", Tan(Pi) => Tan(0)),
                 rule!("periodicity tan", Tan(+(*(~a:(is_integer,!is_zero), Pi), ~~b)) => Tan(+(~~b))),
                 rule!("sin^2 + cos^2 = 1", +(^(Sin(~a), 2), ^(Cos(~a), 2)) => 1),
-            ])
+            ]),
+            Self::FullExpand => Self::create_rulesets(&[
+                Self::Form,
+                Self::Addition,
+                Self::Multiplication,
+                Self::Division,
+                Self::Powers,
+                Self::Derivative,
+                Self::Trigonometry,
+            ]),
         }
     }
 }

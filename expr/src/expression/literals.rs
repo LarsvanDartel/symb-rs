@@ -47,7 +47,7 @@ pub const fn matching_parentheses(c: char) -> Option<char> {
 }
 
 pub mod predicates {
-    use crate::{Action, Expression, Number};
+    use crate::{Action, Expression, Function, Number};
     use num_integer::Integer;
 
     macro_rules! make_predicates {
@@ -155,7 +155,7 @@ pub mod predicates {
             matches!(e.action, Action::Var { .. })
         }
 
-        pub fn can_combine(e: &Expression) -> bool {
+        pub fn can_reduce(e: &Expression) -> bool {
             if let Action::Add | Action::Mul = e.action {
                 e.children.len() > 1
             } else {
@@ -170,12 +170,26 @@ pub mod predicates {
                 false
             }
         }
+
+        pub fn is_derivative_independent(e: &Expression) -> bool {
+            if let Action::Fun(Function::D) = e.action {
+                assert_eq!(e.children.len(), 2);
+                let var = if let Action::Var { name } = &e.children[1].action {
+                    name
+                } else {
+                    panic!("Expected variable, got {:?}", e.children[1]);
+                };
+                !e.children[0].has_variable(var)
+            } else {
+                false
+            }
+        }
     }
 }
 
 pub mod maps {
     use super::predicates::{is_integer, is_number, is_one, is_zero};
-    use crate::{Action, Expression, Number};
+    use crate::{Action, Expression, Function, Number};
     use num_integer::Integer;
     use std::collections::HashMap;
 
@@ -243,6 +257,71 @@ pub mod maps {
                         .collect(),
                     Action::Mul,
                 )
+            } else if let Action::Fun(Function::D) = action {
+                assert_eq!(e.action, Action::Fun(Function::D));
+                match e.children[0].action {
+                    Action::Add => {
+                        let mut res = vec![];
+                        for c in &e.children[0].children {
+                            res.push(Expression::create_function(
+                                Function::D,
+                                vec![c.clone(), e.children[1].clone()],
+                            ));
+                        }
+                        Expression::new(res, Action::Add)
+                    },
+                    Action::Mul => {
+                        let f = e.children[0].clone();
+                        assert!(f.children.len() >= 2);
+                        let arg = e.children[1].clone();
+                        let arg_name = if let Action::Var { name } = &arg.action {
+                            name
+                        } else {
+                            panic!("Expected variable, got {:?}", arg);
+                        };
+                        let independent = f.children
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, c)| !c.has_variable(arg_name))
+                            .collect::<Vec<_>>();
+
+                        if independent.len() == f.children.len() {
+                            return Expression::create_value(Number::Int(0));
+                        }
+
+                        if !independent.is_empty() {
+                            let mut p1 = independent
+                                .iter()
+                                .map(|(i, _)| f.children[*i].clone())
+                                .collect::<Vec<_>>();
+                            let p2 = f.children
+                                .iter()
+                                .enumerate()
+                                .filter(|(i, _)| !independent.iter().any(|(j, _)| i == j))
+                                .map(|(_, c)| c.clone())
+                                .collect::<Vec<_>>();
+                            let d = if p2.len() == 1 {
+                                Expression::create_function(Function::D, vec![p2[0].clone(), arg.clone()])
+                            } else {
+                                Expression::create_function(Function::D, vec![Expression::new(p2, Action::Mul), arg.clone()])
+                            };
+                            p1.push(d);
+                            return Expression::new(p1, Action::Mul);
+                        }
+
+                        let p1 = f.children[0].clone();
+                        let p2 = if f.children.len() == 2 {
+                            f.children[1].clone()
+                        } else {
+                            Expression::new(f.children[1..].to_vec(), Action::Mul)
+                        };
+                        let d1 = Expression::create_function(Function::D, vec![p1.clone(), arg.clone()]);
+                        let d2 = Expression::create_function(Function::D, vec![p2.clone(), arg.clone()]);
+                        Expression::new(vec![p1 * d2, p2 * d1], Action::Add)
+                    },
+                    _ => panic!("Cannot derive {:?}", e.children[0].action),
+                }
+
             } else {
                 panic!("Cannot reduce {:?}", action);
             }
