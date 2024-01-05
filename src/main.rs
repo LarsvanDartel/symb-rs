@@ -82,10 +82,13 @@ impl Rules {
             ]),
             Self::Derivative => RuleSet(vec![
                 rule!("indepence", ~a::is_derivative_independent => 0),
+                rule!("linearity", D(*(~~a:is_value:!is_empty, ~~b:!is_value:!is_empty), ~x) => *(~~a, D(~~b, ~x))),
                 rule!("identity", D(~x, ~x) => 1),
-                rule!("linearity", D(*(~~a:is_value:!is_empty, ~~b::!is_empty), ~x) => *(~~a, D(~~b, ~x))),
+                rule!("natural power", D(^(~x, ~n:(is_integer,!is_zero,!is_one)), ~x) => *(~n, ^(~x, +(~n, -1)))),
+                rule!("natural power", D(^(~y:!is_variable, ~n:(is_integer,!is_zero,!is_one)), ~x) => *(~n, ^(~y, +(~n, -1)), D(~y, ~x))),
                 rule!("additivity", D(+(~~a), ~x) => reduce(D(+(~~a), ~x), D)),
                 rule!("multiplicativity", D(*(~~a::can_reduce), ~x) => reduce(D(*(~~a), ~x), D)),
+
             ]),
             Self::Trigonometry => RuleSet(vec![
                 // Trigonometry
