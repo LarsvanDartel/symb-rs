@@ -4,6 +4,9 @@ use crate::Expression;
 
 pub trait Rule {
     fn apply(&self, expr: &Expression) -> Option<Expression>;
+    fn counts(&self) -> bool {
+        true
+    }
     fn name(&self) -> &str {
         "Unnamed rule"
     }
@@ -23,14 +26,16 @@ pub struct MatchRule {
     name: String,
     pattern: Expression,
     replacement: Expression,
+    show: bool,
 }
 
 impl MatchRule {
-    pub fn new<T: ToString>(name: T, pattern: Expression, replacement: Expression) -> Self {
+    pub fn new<T: ToString>(name: T, pattern: Expression, replacement: Expression, show: bool) -> Self {
         Self {
             name: name.to_string(),
             pattern,
             replacement,
+            show
         }
     }
 }
@@ -51,6 +56,10 @@ impl Rule for MatchRule {
             }
             None
         }
+    }
+
+    fn counts(&self) -> bool {
+        self.show
     }
 
     fn name(&self) -> &str {

@@ -194,7 +194,7 @@ impl Expression {
         }
 
         true
-    }
+    } 
 
     fn match_children_ordered(
         &self,
@@ -329,11 +329,13 @@ impl Expression {
 impl Expression {
     pub fn apply_ruleset<R: RuleSet>(&self, ruleset: &R, print: bool) -> Expression {
         let mut expr = self.clone();
+        let mut cnt = 0;
         loop {
             let mut applied = false;
             for rule in ruleset.rules() {
                 if let Some(new_expr) = expr.apply_rule(rule) {
-                    if print {
+                    if print && rule.counts() {
+                        cnt += 1;
                         println!("{}: {} = {}", rule.name(), expr, new_expr);
                     }
                     expr = new_expr;
@@ -344,6 +346,9 @@ impl Expression {
             if !applied {
                 break;
             }
+        }
+        if print {
+            println!("{} rule{} applied", cnt, if cnt == 1 { "" } else { "s" });
         }
         expr
     }

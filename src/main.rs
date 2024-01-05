@@ -37,24 +37,24 @@ impl Rules {
     fn create_ruleset(&self) -> RuleSet {
         match self {
             Self::Cleanup => RuleSet(vec![
-                rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b)),
-                rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b)),
-                rule!("create rational", /(~a:is_integer, ~b:(is_integer,!is_zero)) => create_rational(~a, ~b)),
+                rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b), false),
+                rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b), false),
+                rule!("create rational", /(~a:is_integer, ~b:(is_integer,!is_zero)) => create_rational(~a, ~b), false),
             ]),
             Self::Form => RuleSet(vec![
                 rule!("identity minus", -(~a, ~b) => +(~a, *(-1, ~b))),
                 rule!("identity divide", /(~a, ~b:(!is_zero,!is_one)) => *(~a, ^(~b, -1))),
             ]),
             Self::Addition => RuleSet(vec![
-                rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b)),
-                rule!("collapse addition", +(~a) => ~a),
+                rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b), false),
+                rule!("collapse addition", +(~a) => ~a, false),
                 rule!("numeric addition", +(~~a:is_number:can_reduce, ~~b:!is_number) => +(reduce(~~a, +), ~~b)),
                 rule!("identity addition", +(~~a:!is_zero:!is_empty, ~~b:is_zero:!is_empty) => ~~a),
-                rule!("combine addition", +(~~a::can_combine) => combine(~~a, +)),
+                rule!("combine terms", +(~~a::can_combine) => combine(~~a, +)),
             ]),
             Self::Multiplication => RuleSet(vec![
-                rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b)),
-                rule!("collapse multiplication", *(~a) => ~a),
+                rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b), false),
+                rule!("collapse multiplication", *(~a) => ~a, false),
                 rule!("numeric multiplication", *(~~a:is_number:can_reduce, ~~b:!is_number) => *(reduce(~~a, *), ~~b)),
                 rule!("identity multiplication", *(~~a:!is_one:!is_empty, ~~b:is_one:!is_empty) => ~~a),
                 rule!("absorber multiplication", *(~~a::!is_empty, 0) => 0),

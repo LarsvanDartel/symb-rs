@@ -383,7 +383,29 @@ pub fn rule(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let replacement = parse_expr(&mut input, false);
 
+    if input.peek().is_none() {
+        return proc_macro::TokenStream::from(quote! {
+            Box::new(::expr::MatchRule::new(#name, #pattern, #replacement, true))
+        });
+    }
+
+    eat(',', &mut input);
+
+    let show = if let Some(TokenTree::Ident(ident)) = input.peek() {
+        if ident.to_string() == "true" {
+            input.next();
+            true
+        } else if ident.to_string() == "false" {
+            input.next();
+            false
+        } else {
+            panic!("Expected 'true' or 'false'")
+        }
+    } else {
+        panic!("Expected 'true' or 'false'")
+    };
+
     proc_macro::TokenStream::from(quote! {
-        Box::new(::expr::MatchRule::new(#name, #pattern, #replacement))
+        Box::new(::expr::MatchRule::new(#name, #pattern, #replacement, #show))
     })
 }
