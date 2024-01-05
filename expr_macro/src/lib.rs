@@ -2,10 +2,13 @@ extern crate expr;
 extern crate proc_macro;
 
 use core::panic;
-use std::iter::Peekable;
+use std::{iter::Peekable, str::FromStr};
 
-use expr::literals::{maps::MAPS, predicates::PREDICATES, CONSTANTS, FUNCTIONS};
-use proc_macro2::{token_stream::IntoIter, Group, Ident, TokenStream, TokenTree, Literal};
+use expr::{
+    literals::{CONSTANTS, FUNCTIONS},
+    PredicateType, Map,
+};
+use proc_macro2::{token_stream::IntoIter, Group, Ident, Literal, TokenStream, TokenTree};
 use quote::{quote, ToTokens};
 
 #[proc_macro]
@@ -110,18 +113,14 @@ fn eat(punct: char, input: &mut Peekable<IntoIter>) {
 
 fn parse_pattern(input: &mut Peekable<IntoIter>) -> TokenStream {
     let token = input.next().expect("Expected identifier after '~'");
-    let name;
-    let is_segment;
 
-    if let TokenTree::Ident(ident) = token {
-        name = ident.to_string();
-        is_segment = false;
+    let (name, is_segment) = if let TokenTree::Ident(ident) = token {
+        (ident.to_string(), false)
     } else if let TokenTree::Punct(punct) = token {
         if punct.as_char() == '~' {
             let token = input.next().expect("Expected identifier after '~'");
             if let TokenTree::Ident(ident) = token {
-                name = ident.to_string();
-                is_segment = true;
+                (ident.to_string(), true)
             } else {
                 panic!("Expected identifier after '~'")
             }
@@ -130,56 +129,53 @@ fn parse_pattern(input: &mut Peekable<IntoIter>) -> TokenStream {
         }
     } else {
         panic!("Expected identifier or '~'")
-    }
-
-    let mut matcher = TokenStream::new();
-    if let Some(TokenTree::Punct(punct)) = input.peek() {
-        if punct.as_char() == ':' {
-            input.next();
-            matcher.extend(quote! { &|e| });
-            let predicate = parse_predicate(input);
-            if !predicate.is_empty() {
-                matcher.extend(quote! { #predicate });
-            } else {
-                matcher.extend(quote! { true });
-            }
-        }
-    }
-
-    if matcher.is_empty() {
-        matcher = quote! { &|_| true }
-    }
+    };
 
     let mut predicate = TokenStream::new();
     if let Some(TokenTree::Punct(punct)) = input.peek() {
         if punct.as_char() == ':' {
             input.next();
-            predicate.extend(quote! { &|e| });
-            predicate.extend(parse_predicate(input));
+            predicate.extend(parse_predicate(input))
         }
     }
 
-    if predicate.is_empty() {
-        predicate = quote! { &|_| true }
+    let mut min_size = None;
+    if let Some(TokenTree::Punct(punct)) = input.peek() {
+        if punct.as_char() == ':' {
+            input.next();
+            let token = input.next().expect("Expected number after ':'");
+            if let TokenTree::Literal(literal) = token {
+                if let Ok(min) = usize::from_str(&literal.to_string()) {
+                    min_size = Some(min);
+                } else {
+                    panic!("Expected number after ':'")
+                }
+            } else {
+                panic!("Expected number after ':'")
+            }
+        }
     }
 
     if is_segment {
+        let min_size = min_size.unwrap_or_default();
         quote! {
             ::expr::Expression::new_empty(
                 ::expr::Action::Segment {
                     name: String::from(#name),
-                    matcher: #matcher,
-                    predicate: #predicate
+                    predicate: ::expr::Predicate::new(vec![#predicate]),
+                    min_size: #min_size
                 }
             )
         }
     } else {
+        if min_size.is_some() {
+            panic!("Min size is only allowed for segments")
+        }
         quote! {
             ::expr::Expression::new_empty(
                 ::expr::Action::Slot {
                     name: String::from(#name),
-                    matcher: #matcher,
-                    predicate: #predicate
+                    predicate: ::expr::Predicate::new(vec![#predicate])
                 }
             )
         }
@@ -200,12 +196,10 @@ fn parse_predicate(input: &mut Peekable<IntoIter>) -> TokenStream {
         let mut i = 0;
         while group.peek().is_some() {
             if i > 0 {
-                predicate.extend(quote! { && });
+                eat(',', &mut group);
+                predicate.extend(quote! { , });
             }
             predicate.extend(parse_predicate(&mut group));
-            if group.peek().is_some() {
-                eat(',', &mut group);
-            }
             i += 1;
         }
 
@@ -216,20 +210,19 @@ fn parse_predicate(input: &mut Peekable<IntoIter>) -> TokenStream {
         return predicate;
     }
 
-    if let TokenTree::Punct(punct) = token {
-        if punct.as_char() == '!' {
-            predicate.extend(quote! { ! });
-            token = input.next().expect("Expected identifier after '!'");
-        } else {
-            panic!("Expected identifier after ':'")
-        }
+    let positive = !matches!(&token, TokenTree::Punct(punct) if punct.as_char() == '!');
+    if !positive {
+        token = input.next().expect("Expected identifier after '!'")
     }
 
     if let TokenTree::Ident(ident) = token {
-        if PREDICATES.contains(&ident.to_string().as_str()) {
-            predicate.extend(quote! { ::expr::literals::predicates::#ident(e) });
+        if let Ok(predicate_type) = PredicateType::from_str(&ident.to_string()) {
+            let predicate_type = Ident::new(&format!("{:?}", predicate_type), ident.span());
+            predicate.extend(quote! {
+                (::expr::PredicateType::#predicate_type, #positive)
+            });
         } else {
-            predicate.extend(quote! { #ident(e) });
+            panic!("Unknown predicate: {}", ident.to_string())
         }
     } else {
         panic!("Expected identifier after ':'")
@@ -267,7 +260,8 @@ fn parse_ident(ident: Ident, input: &mut Peekable<IntoIter>) -> TokenStream {
         quote! {
             ::expr::Expression::create_constant(expr::Constant::#ident)
         }
-    } else if MAPS.contains(&ident.to_string().as_str()) {
+    } else if let Ok(map) = Map::from_str(&ident.to_string()) {
+        let map = Ident::new(&format!("{:?}", map), ident.span());
         if let Some(TokenTree::Group(group)) = input.peek() {
             let mut group = group.stream().into_iter().peekable();
             input.next();
@@ -277,7 +271,7 @@ fn parse_ident(ident: Ident, input: &mut Peekable<IntoIter>) -> TokenStream {
             quote! {
                 ::expr::Expression::new(vec![#expr], ::expr::Action::Map {
                     name: String::from(#name),
-                    map: &|e| ::expr::literals::maps::#ident(e)
+                    map: ::expr::Map::#map
                 })
             }
         } else {
@@ -304,7 +298,7 @@ fn parse_group(group: Group) -> TokenStream {
     }
 }
 
-fn parse_literal(literal: Literal, input: &mut Peekable<IntoIter>,negative: bool) -> TokenStream {
+fn parse_literal(literal: Literal, input: &mut Peekable<IntoIter>, negative: bool) -> TokenStream {
     let literal = if negative {
         quote! { -#literal }
     } else {
@@ -313,9 +307,7 @@ fn parse_literal(literal: Literal, input: &mut Peekable<IntoIter>,negative: bool
     if let Some(TokenTree::Punct(punct)) = input.peek() {
         if punct.as_char() == '/' {
             input.next();
-            let denominator = input
-                .next()
-                .expect("Expected denominator after '/'");
+            let denominator = input.next().expect("Expected denominator after '/'");
             if let TokenTree::Literal(denominator) = denominator {
                 return quote! {
                     ::expr::Expression::new(vec![], ::expr::Action::Num {

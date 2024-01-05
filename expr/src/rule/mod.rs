@@ -43,6 +43,9 @@ impl MatchRule {
 impl Rule for MatchRule {
     fn apply(&self, expr: &Expression) -> Option<Expression> {
         let mut patterns = HashMap::new();
+        if expr.is_error() {
+            return None;
+        }
         if self.pattern.matches(expr, &mut patterns) {
             Some(self.replacement.substitute_pattern(&patterns))
         } else {

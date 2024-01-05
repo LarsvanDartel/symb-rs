@@ -2,11 +2,14 @@ mod action;
 pub mod literals;
 mod parser;
 
-pub use action::{Action, Constant, Function, Number};
-pub use literals::{maps, predicates};
-use parser::Parser;
-use std::{collections::HashMap, str::FromStr, hash::{Hash, Hasher, DefaultHasher}};
 use crate::{Rule, RuleSet};
+pub use action::{Action, Constant, Function, Map, Number, Predicate, PredicateType};
+use parser::Parser;
+use std::{
+    collections::HashMap,
+    hash::{DefaultHasher, Hash, Hasher},
+    str::FromStr,
+};
 
 #[derive(Clone)]
 pub struct Expression {
@@ -63,10 +66,89 @@ impl Expression {
     }
 }
 
-/// Matching expressions
+/// Utility functions
 impl Expression {
-    fn is_pattern(&self) -> bool {
-        matches!(self.action, Action::Slot { .. } | Action::Segment { .. })
+    pub(crate) fn split(&self, action: &Action) -> (Option<Expression>, Option<Expression>) {
+        if let Action::Add = action {
+            if let Action::Mul = self.action {
+                let mut p1 = vec![];
+                let mut p2 = vec![];
+                for c in &self.children {
+                    if let Action::Num { .. } = c.action {
+                        p2.push(c.clone());
+                    } else {
+                        p1.push(c.clone());
+                    }
+                }
+                let p1 = if p1.is_empty() {
+                    None
+                } else if p1.len() == 1 {
+                    Some(p1[0].clone())
+                } else {
+                    Some(Expression::new(p1, Action::Mul))
+                };
+                let p2 = if p2.is_empty() {
+                    None
+                } else if p2.len() == 1 {
+                    Some(p2[0].clone())
+                } else {
+                    Some(Expression::new(p2, Action::Mul))
+                };
+                (p1, p2)
+            } else {
+                if let Action::Num { .. } = self.action {
+                    (None, Some(self.clone()))
+                } else {
+                    (Some(self.clone()), None)
+                }
+            }
+        } else if let Action::Mul = action {
+            if let Action::Pow = self.action {
+                (
+                    Some(self.children[0].clone()),
+                    Some(self.children[1].clone()),
+                )
+            } else {
+                (Some(self.clone()), None)
+            }
+        } else {
+            panic!("Invalid action {:?}", action);
+        }
+    }
+
+    pub(crate) fn count_variables(&self) -> [usize; 26] {
+        if let Action::Var { name } = &self.action {
+            let mut res = [0; 26];
+            res[name.chars().next().unwrap() as usize - 'a' as usize] = 1;
+            res
+        } else if let Action::Pow = self.action {
+            if let Action::Num {
+                value: Number::Int(i),
+            } = self.children[1].action
+            {
+                if i < 0 {
+                    return [0; 26];
+                }
+                let mut res = self.children[0].count_variables();
+                for c in &mut res {
+                    *c *= i as usize;
+                }
+                res
+            } else {
+                return [0; 26];
+            }
+        } else if let Action::Mul = self.action {
+            let mut res = [0; 26];
+            for c in &self.children {
+                let p = c.count_variables();
+                for (i, c) in p.iter().enumerate() {
+                    res[i] += c;
+                }
+            }
+            res
+        } else {
+            [0; 26]
+        }
     }
 
     pub(crate) fn has_variable(&self, var: &String) -> bool {
@@ -74,6 +156,17 @@ impl Expression {
             return name == var;
         }
         self.children.iter().any(|c| c.has_variable(var))
+    }
+
+    pub fn is_error(&self) -> bool {
+        matches!(self.action, Action::Err(_))
+    }
+}
+
+/// Matching expressions
+impl Expression {
+    fn is_pattern(&self) -> bool {
+        matches!(self.action, Action::Slot { .. } | Action::Segment { .. })
     }
 
     fn match_children_unordered(
@@ -134,15 +227,16 @@ impl Expression {
             }
             for (j, p) in self_patterns.iter().enumerate() {
                 let p = &self.children[*p];
-                if let Action::Slot { matcher, .. } = p.action {
-                    if matcher(c) {
-                        if other_matched[i] {
-                            patterns.clear();
-                            return false;
-                        }
-                        possible_matches[j].push(i);
-                        other_matched[i] = true;
+                if let Action::Slot { predicate, .. } = &p.action {
+                    if !predicate.matches(c) {
+                        continue;
                     }
+                    if other_matched[i] {
+                        patterns.clear();
+                        return false;
+                    }
+                    possible_matches[j].push(i);
+                    other_matched[i] = true;
                 }
             }
             if other_matched[i] {
@@ -150,15 +244,16 @@ impl Expression {
             }
             for (j, p) in self_patterns.iter().enumerate() {
                 let p = &self.children[*p];
-                if let Action::Segment { matcher, .. } = p.action {
-                    if matcher(c) {
-                        if other_matched[i] {
-                            patterns.clear();
-                            return false;
-                        }
-                        possible_matches[j].push(i);
-                        other_matched[i] = true;
+                if let Action::Segment { predicate, .. } = &p.action {
+                    if !predicate.matches(c) {
+                        continue;
                     }
+                    if other_matched[i] {
+                        patterns.clear();
+                        return false;
+                    }
+                    possible_matches[j].push(i);
+                    other_matched[i] = true;
                 }
             }
         }
@@ -194,7 +289,7 @@ impl Expression {
         }
 
         true
-    } 
+    }
 
     fn match_children_ordered(
         &self,
@@ -226,34 +321,22 @@ impl Expression {
                 Action::Segment { .. } | Action::Slot { .. },
             ) => panic!("Ambiguous pattern match"),
             (_, Action::Slot { .. }) | (_, Action::Segment { .. }) => false,
-            (
-                Action::Slot {
-                    name,
-                    matcher,
-                    predicate,
-                },
-                _,
-            ) => {
+            (Action::Slot { name, predicate }, _) => {
                 if let Some(expr) = patterns.get(name) {
                     return expr.clone().matches(other, patterns);
                 }
-                if !matcher(other) || !predicate(other) {
+                if !predicate.matches(other) {
                     patterns.clear();
                     return false;
                 }
                 patterns.insert(name.clone(), other.clone());
                 true
             }
-            (
-                Action::Segment {
-                    name, predicate, ..
-                },
-                _,
-            ) => {
+            (Action::Segment { name, min_size, .. }, _) => {
                 if let Some(expr) = patterns.get(name) {
                     return expr.clone().matches(other, patterns);
                 }
-                if !predicate(other) {
+                if other.children.len() < *min_size {
                     patterns.clear();
                     return false;
                 }
@@ -299,9 +382,7 @@ impl Expression {
                     Expression::create_error(format!("Pattern {} not found", name))
                 }
             }
-            Action::Map { map, .. } => {
-                map(&self.children[0].substitute_pattern(patterns))
-            }
+            Action::Map { map, .. } => map.map(self.children[0].substitute_pattern(patterns)),
             _ => {
                 let mut children = vec![];
                 for c in &self.children {
@@ -449,7 +530,9 @@ impl std::ops::Neg for Expression {
 
 impl PartialEq for Expression {
     fn eq(&self, other: &Self) -> bool {
-        if let (Action::Add, Action::Add) | (Action::Mul, Action::Mul) = (&self.action, &other.action) {
+        if let (Action::Add, Action::Add) | (Action::Mul, Action::Mul) =
+            (&self.action, &other.action)
+        {
             let mut matched = vec![false; other.children.len()];
             for c1 in &self.children {
                 let mut found = false;
@@ -526,7 +609,7 @@ impl std::fmt::Display for Expression {
             f.write_str(&self.action.to_string())?;
         } else {
             for i in 0..self.children.len() {
-                if i > 0 {
+                if i > 0 && self.action != Action::Mul {
                     f.write_str(&self.action.to_string())?;
                 }
                 if self.children[i].action <= self.action {

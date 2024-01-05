@@ -1,14 +1,17 @@
 mod constant;
 mod function;
 mod number;
-
-use std::hash::{Hash, Hasher};
+mod predicate;
+mod map;
 
 use crate::{literals, Expression};
 pub use constant::Constant;
 pub use function::Function;
 pub use number::Number;
+pub use predicate::{Predicate, PredicateType};
+pub use map::Map;
 
+#[derive(Clone, Hash)]
 pub enum Action {
     /// Addition
     Add,
@@ -46,21 +49,20 @@ pub enum Action {
     /// Placeholder for a single expression
     Slot {
         name: String,
-        matcher: &'static dyn Fn(&Expression) -> bool,
-        predicate: &'static dyn Fn(&Expression) -> bool,
+        predicate: Predicate,
     },
 
     /// Placeholder for a list of expressions
     Segment {
         name: String,
-        matcher: &'static dyn Fn(&Expression) -> bool,
-        predicate: &'static dyn Fn(&Expression) -> bool,
+        predicate: Predicate,
+        min_size: usize,
     },
 
     /// Map from expression to expression
     Map {
         name: String,
-        map: &'static dyn Fn(&Expression) -> Expression,
+        map: Map,
     },
 }
 
@@ -129,46 +131,6 @@ impl PartialOrd for Action {
     }
 }
 
-impl Clone for Action {
-    fn clone(&self) -> Self {
-        match self {
-            Self::Add => Self::Add,
-            Self::Sub => Self::Sub,
-            Self::Mul => Self::Mul,
-            Self::Div => Self::Div,
-            Self::Pow => Self::Pow,
-            Self::Equals => Self::Equals,
-            Self::Var { name } => Self::Var { name: name.clone() },
-            Self::Num { value } => Self::Num { value: *value },
-            Self::Fun(arg0) => Self::Fun(arg0.clone()),
-            Self::Const(arg0) => Self::Const(arg0.clone()),
-            Self::Err(arg0) => Self::Err(arg0.clone()),
-            Self::Slot {
-                name,
-                matcher,
-                predicate,
-            } => Self::Slot {
-                name: name.clone(),
-                matcher: *matcher,
-                predicate: *predicate,
-            },
-            Self::Segment {
-                name,
-                matcher,
-                predicate,
-            } => Self::Segment {
-                name: name.clone(),
-                matcher: *matcher,
-                predicate: *predicate,
-            },
-            Self::Map { name, map } => Self::Map {
-                name: name.clone(),
-                map: *map,
-            },
-        }
-    }
-}
-
 impl std::fmt::Display for Action {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self {
@@ -213,51 +175,6 @@ impl std::fmt::Debug for Action {
                 .field("name", name)
                 .finish_non_exhaustive(),
             Self::Map { name, .. } => write!(f, "{:?}", name),
-        }
-    }
-}
-
-impl Hash for Action {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            Self::Add => state.write_u8(0),
-            Self::Sub => state.write_u8(1),
-            Self::Mul => state.write_u8(2),
-            Self::Div => state.write_u8(3),
-            Self::Pow => state.write_u8(4),
-            Self::Equals => state.write_u8(5),
-            Self::Var { name } => {
-                state.write_u8(6);
-                name.hash(state);
-            }
-            Self::Num { value } => {
-                state.write_u8(7);
-                value.hash(state);
-            }
-            Self::Fun(function) => {
-                state.write_u8(8);
-                function.hash(state);
-            }
-            Self::Const(constant) => {
-                state.write_u8(9);
-                constant.hash(state);
-            }
-            Self::Err(message) => {
-                state.write_u8(10);
-                message.hash(state);
-            }
-            Self::Slot { name, .. } => {
-                state.write_u8(11);
-                name.hash(state);
-            }
-            Self::Segment { name, .. } => {
-                state.write_u8(12);
-                name.hash(state);
-            }
-            Self::Map { name, .. } => {
-                state.write_u8(13);
-                name.hash(state);
-            }
         }
     }
 }
