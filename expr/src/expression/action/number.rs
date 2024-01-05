@@ -1,5 +1,5 @@
-use std::str::FromStr;
 use std::hash::{Hash, Hasher};
+use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Number {

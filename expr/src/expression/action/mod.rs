@@ -1,17 +1,17 @@
 mod constant;
 mod function;
+mod map;
 mod number;
 mod predicate;
-mod map;
 
 use crate::{literals, Expression};
 pub use constant::Constant;
 pub use function::Function;
+pub use map::Map;
 pub use number::Number;
 pub use predicate::{Predicate, PredicateType};
-pub use map::Map;
 
-#[derive(Clone, Hash)]
+#[derive(Clone, PartialEq, Hash)]
 pub enum Action {
     /// Addition
     Add,
@@ -47,10 +47,7 @@ pub enum Action {
     Err(String),
 
     /// Placeholder for a single expression
-    Slot {
-        name: String,
-        predicate: Predicate,
-    },
+    Slot { name: String, predicate: Predicate },
 
     /// Placeholder for a list of expressions
     Segment {
@@ -60,10 +57,7 @@ pub enum Action {
     },
 
     /// Map from expression to expression
-    Map {
-        name: String,
-        map: Map,
-    },
+    Map { name: String, map: Map },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -100,27 +94,6 @@ impl Action {
             Self::Add => Expression::create_value(0),
             Self::Mul => Expression::create_value(1),
             _ => panic!("No identity for {:?}", self),
-        }
-    }
-}
-
-impl PartialEq for Action {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Var { name: a }, Self::Var { name: b }) => a == b,
-            (Self::Num { value: a }, Self::Num { value: b }) => a == b,
-            (Self::Fun(a), Self::Fun(b)) => a == b,
-            (Self::Const(a), Self::Const(b)) => a == b,
-            (Self::Err(_), Self::Err(_)) => false,
-            (Self::Slot { name: a, .. }, Self::Slot { name: b, .. }) => a == b,
-            (Self::Segment { name: a, .. }, Self::Segment { name: b, .. }) => a == b,
-            (Self::Add, Self::Add) => true,
-            (Self::Sub, Self::Sub) => true,
-            (Self::Mul, Self::Mul) => true,
-            (Self::Div, Self::Div) => true,
-            (Self::Pow, Self::Pow) => true,
-            (Self::Equals, Self::Equals) => true,
-            _ => false,
         }
     }
 }

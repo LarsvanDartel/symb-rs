@@ -95,12 +95,10 @@ impl Expression {
                     Some(Expression::new(p2, Action::Mul))
                 };
                 (p1, p2)
+            } else if let Action::Num { .. } = self.action {
+                (None, Some(self.clone()))
             } else {
-                if let Action::Num { .. } = self.action {
-                    (None, Some(self.clone()))
-                } else {
-                    (Some(self.clone()), None)
-                }
+                (Some(self.clone()), None)
             }
         } else if let Action::Mul = action {
             if let Action::Pow = self.action {
@@ -269,7 +267,7 @@ impl Expression {
                     return false;
                 }
                 possible_matches[i]
-                    .get(0)
+                    .first()
                     .map(|&j| other.children[j].clone())
                     .unwrap_or(Expression::new_empty(other.action.clone()))
             } else if let Action::Segment { .. } = p.action {
@@ -396,7 +394,7 @@ impl Expression {
                     }
                 }
                 if let Action::Add | Action::Mul = self.action {
-                    if children.len() == 0 {
+                    if children.is_empty() {
                         return self.action.identity();
                     }
                 }

@@ -30,12 +30,17 @@ pub struct MatchRule {
 }
 
 impl MatchRule {
-    pub fn new<T: ToString>(name: T, pattern: Expression, replacement: Expression, show: bool) -> Self {
+    pub fn new<T: ToString>(
+        name: T,
+        pattern: Expression,
+        replacement: Expression,
+        show: bool,
+    ) -> Self {
         Self {
             name: name.to_string(),
             pattern,
             replacement,
-            show
+            show,
         }
     }
 }

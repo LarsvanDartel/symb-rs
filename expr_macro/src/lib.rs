@@ -6,7 +6,7 @@ use std::{iter::Peekable, str::FromStr};
 
 use expr::{
     literals::{CONSTANTS, FUNCTIONS},
-    PredicateType, Map,
+    Map, PredicateType,
 };
 use proc_macro2::{token_stream::IntoIter, Group, Ident, Literal, TokenStream, TokenTree};
 use quote::{quote, ToTokens};
@@ -232,13 +232,13 @@ fn parse_predicate(input: &mut Peekable<IntoIter>) -> TokenStream {
 }
 
 fn parse_ident(ident: Ident, input: &mut Peekable<IntoIter>) -> TokenStream {
-    if ident.to_string() == "Error" {
+    if ident == "Error" {
         if let Some(TokenTree::Group(group)) = input.next() {
             let group = group.stream().into_iter();
             if let Some(TokenTree::Literal(literal)) = group.into_iter().next() {
-                return quote! {
+                quote! {
                     ::expr::Expression::create_error(#literal)
-                };
+                }
             } else {
                 panic!("Expected literal after 'Error'")
             }
@@ -365,10 +365,10 @@ pub fn rule(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     eat(',', &mut input);
 
     let show = if let Some(TokenTree::Ident(ident)) = input.peek() {
-        if ident.to_string() == "true" {
+        if *ident == "true" {
             input.next();
             true
-        } else if ident.to_string() == "false" {
+        } else if *ident == "false" {
             input.next();
             false
         } else {

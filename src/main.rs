@@ -48,7 +48,7 @@ impl Rules {
                 rule!("numeric addition", +(~~a:is_number:2, ~~b:!is_number:1) => +(reduce(~~a), ~~b)),
                 rule!("identity addition", +(~~a:!is_zero:1, ~~b:is_zero:1) => ~~a),
                 rule!("identity minus", -(~a, ~b) => +(~a, *(-1, ~b))),
-                ]),
+            ]),
             Self::Multiplication => RuleSet(vec![
                 rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b), false),
                 rule!("collapse multiplication", *(~a) => ~a, false),

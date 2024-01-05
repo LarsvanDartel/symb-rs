@@ -1,7 +1,7 @@
-use std::{str::FromStr, collections::HashMap};
+use std::{collections::HashMap, str::FromStr};
 
-use crate::{Expression, Action, Number, Function};
-use super::predicate::{is_number, is_integer, is_zero, is_one, is_value};
+use super::predicate::{is_integer, is_number, is_one, is_value, is_zero};
+use crate::{Action, Expression, Function, Number};
 use num_integer::Integer;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -91,9 +91,7 @@ fn reduce(e: &Expression) -> Expression {
 
         assert!(!negative);
         Expression::new(
-            std::iter::repeat(e.children[0].clone())
-                .take(pow)
-                .collect(),
+            std::iter::repeat(e.children[0].clone()).take(pow).collect(),
             Action::Mul,
         )
     } else if let Action::Fun(Function::D) = e.action {
@@ -107,7 +105,7 @@ fn reduce(e: &Expression) -> Expression {
                     ));
                 }
                 Expression::new(res, Action::Add)
-            },
+            }
             Action::Mul => {
                 let f = e.children[0].clone();
                 assert!(f.children.len() >= 2);
@@ -117,7 +115,8 @@ fn reduce(e: &Expression) -> Expression {
                 } else {
                     panic!("Expected variable, got {:?}", arg);
                 };
-                let independent = f.children
+                let independent = f
+                    .children
                     .iter()
                     .enumerate()
                     .filter(|(_, c)| !c.has_variable(arg_name))
@@ -132,7 +131,8 @@ fn reduce(e: &Expression) -> Expression {
                         .iter()
                         .map(|(i, _)| f.children[*i].clone())
                         .collect::<Vec<_>>();
-                    let p2 = f.children
+                    let p2 = f
+                        .children
                         .iter()
                         .enumerate()
                         .filter(|(i, _)| !independent.iter().any(|(j, _)| i == j))
@@ -141,7 +141,10 @@ fn reduce(e: &Expression) -> Expression {
                     let d = if p2.len() == 1 {
                         Expression::create_function(Function::D, vec![p2[0].clone(), arg.clone()])
                     } else {
-                        Expression::create_function(Function::D, vec![Expression::new(p2, Action::Mul), arg.clone()])
+                        Expression::create_function(
+                            Function::D,
+                            vec![Expression::new(p2, Action::Mul), arg.clone()],
+                        )
                     };
                     p1.push(d);
                     return Expression::new(p1, Action::Mul);
@@ -156,7 +159,7 @@ fn reduce(e: &Expression) -> Expression {
                 let d1 = Expression::create_function(Function::D, vec![p1.clone(), arg.clone()]);
                 let d2 = Expression::create_function(Function::D, vec![p2.clone(), arg.clone()]);
                 Expression::new(vec![p1 * d2, p2 * d1], Action::Add)
-            },
+            }
             _ => panic!("Cannot derive {:?}", e.children[0].action),
         }
     } else {
@@ -165,7 +168,10 @@ fn reduce(e: &Expression) -> Expression {
 }
 
 pub(crate) fn rational_reduce(e: &Expression) -> Expression {
-    if let Action::Num{value: Number::Rational(num, den)} = e.action {
+    if let Action::Num {
+        value: Number::Rational(num, den),
+    } = e.action
+    {
         let gcd = num.gcd(&den);
         if gcd == den {
             Expression::create_value(Number::Int(num / den))
@@ -182,12 +188,18 @@ pub(crate) fn rational_reduce(e: &Expression) -> Expression {
 pub(crate) fn create_rational(e: &Expression) -> Expression {
     assert_eq!(e.action, Action::Div);
     assert_eq!(e.children.len(), 2);
-    let num = if let Action::Num{value: Number::Int(i)} = e.children[0].action {
+    let num = if let Action::Num {
+        value: Number::Int(i),
+    } = e.children[0].action
+    {
         i
     } else {
         panic!("Expected integer, got {:?}", e.children[0]);
     };
-    let den = if let Action::Num{value: Number::Int(i)} = e.children[1].action {
+    let den = if let Action::Num {
+        value: Number::Int(i),
+    } = e.children[1].action
+    {
         i
     } else {
         panic!("Expected integer, got {:?}", e.children[1]);
@@ -218,11 +230,7 @@ pub(crate) fn distribute(e: &Expression) -> Expression {
         Expression::new(
             a.children
                 .iter()
-                .map(|c| Expression::new_binary(
-                    c.clone(),
-                    b.clone(),
-                    Action::Pow)
-                )
+                .map(|c| Expression::new_binary(c.clone(), b.clone(), Action::Pow))
                 .collect(),
             Action::Mul,
         )
@@ -241,7 +249,9 @@ pub(crate) fn combine(e: &Expression) -> Expression {
                 res.push(c.clone());
                 continue;
             }
-            cnt.entry(p.0.unwrap()).or_insert_with(Vec::new).push((i, p.1));
+            cnt.entry(p.0.unwrap())
+                .or_insert_with(Vec::new)
+                .push((i, p.1));
         }
         for (p, indices) in cnt {
             if indices.len() == 1 {
@@ -258,9 +268,17 @@ pub(crate) fn combine(e: &Expression) -> Expression {
             }
 
             if let Action::Add = e.action {
-                res.push(Expression::new_binary(Expression::new(c, Action::Add), p, Action::Mul));
+                res.push(Expression::new_binary(
+                    Expression::new(c, Action::Add),
+                    p,
+                    Action::Mul,
+                ));
             } else {
-                res.push(Expression::new_binary(p, Expression::new(c, Action::Add), Action::Pow));
+                res.push(Expression::new_binary(
+                    p,
+                    Expression::new(c, Action::Add),
+                    Action::Pow,
+                ));
             }
         }
 
@@ -273,14 +291,16 @@ pub(crate) fn combine(e: &Expression) -> Expression {
 pub(crate) fn sort(e: &Expression) -> Expression {
     let mut res = e.children.clone();
     if e.action == Action::Mul {
-        res.sort_by(|a, b| if is_value(a) {
-            std::cmp::Ordering::Less
-        } else if is_value(b) {
-            std::cmp::Ordering::Greater
-        } else {
-            let a = a.count_variables();
-            let b = b.count_variables();
-            b.cmp(&a)
+        res.sort_by(|a, b| {
+            if is_value(a) {
+                std::cmp::Ordering::Less
+            } else if is_value(b) {
+                std::cmp::Ordering::Greater
+            } else {
+                let a = a.count_variables();
+                let b = b.count_variables();
+                b.cmp(&a)
+            }
         });
     } else if e.action == Action::Add {
         res.sort_by(|a, b| {

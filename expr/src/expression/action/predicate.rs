@@ -211,9 +211,9 @@ pub(crate) fn is_sorted(expr: &Expression) -> bool {
         for (i, c) in expr.children.iter().enumerate().skip(1) {
             let a = c.count_variables();
             let b = expr.children[i - 1].count_variables();
-            if a.iter().sum::<usize>() > b.iter().sum::<usize>() {
-                return false;
-            } else if a.iter().sum::<usize>() == b.iter().sum::<usize>() && a > b {
+            if a.iter().sum::<usize>() > b.iter().sum::<usize>()
+                || (a.iter().sum::<usize>() == b.iter().sum::<usize>() && a > b)
+            {
                 return false;
             }
         }
@@ -222,9 +222,7 @@ pub(crate) fn is_sorted(expr: &Expression) -> bool {
         for (i, c) in expr.children.iter().enumerate().skip(1) {
             let a = c.count_variables();
             let b = expr.children[i - 1].count_variables();
-            if a.iter().sum::<usize>() == 0 {
-                return false;
-            } else if a > b && b.iter().sum::<usize>() != 0 {
+            if a.iter().sum::<usize>() == 0 || (a > b && b.iter().sum::<usize>() != 0) {
                 return false;
             }
         }
