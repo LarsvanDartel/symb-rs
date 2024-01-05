@@ -273,30 +273,11 @@ fn parse_ident(ident: Ident, input: &mut Peekable<IntoIter>) -> TokenStream {
             input.next();
 
             let expr = parse_expr(&mut group, false);
-
-            let mut extra_args = TokenStream::new();
-
-            if group.peek().is_some() {
-                eat(',', &mut group);
-                let mut i = 0;
-                while group.peek().is_some() {
-                    let expr = parse_expr(&mut group, false);
-                    if i > 0 {
-                        extra_args.extend(quote! {, });
-                    }
-                    extra_args.extend(quote! { #expr });
-                    if group.peek().is_some() {
-                        eat(',', &mut group);
-                    }
-                    i += 1;
-                }
-            }
-
             let name = ident.to_string();
             quote! {
                 ::expr::Expression::new(vec![#expr], ::expr::Action::Map {
                     name: String::from(#name),
-                    map: &|e, p| ::expr::literals::maps::#ident(e, p, #extra_args)
+                    map: &|e| ::expr::literals::maps::#ident(e)
                 })
             }
         } else {

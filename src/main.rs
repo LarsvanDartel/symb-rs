@@ -15,7 +15,6 @@ impl expr::RuleSet for RuleSet {
 
 enum Rules {
     Cleanup,
-    Form,
     FullExpand,
     Addition,
     Multiplication,
@@ -23,6 +22,7 @@ enum Rules {
     Powers,
     Derivative,
     Trigonometry,
+    Finalize,
 }
 
 impl Rules {
@@ -39,37 +39,36 @@ impl Rules {
             Self::Cleanup => RuleSet(vec![
                 rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b), false),
                 rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b), false),
-                rule!("create rational", /(~a:is_integer, ~b:(is_integer,!is_zero)) => create_rational(~a, ~b), false),
-            ]),
-            Self::Form => RuleSet(vec![
-                rule!("identity minus", -(~a, ~b) => +(~a, *(-1, ~b))),
-                rule!("identity divide", /(~a, ~b:(!is_zero,!is_one)) => *(~a, ^(~b, -1))),
+                rule!("create rational", /(~a:is_integer, ~b:(is_integer,!is_zero)) => create_rational(/(~a, ~b)), false),
             ]),
             Self::Addition => RuleSet(vec![
                 rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b), false),
                 rule!("collapse addition", +(~a) => ~a, false),
-                rule!("numeric addition", +(~~a:is_number:can_reduce, ~~b:!is_number) => +(reduce(~~a, +), ~~b)),
+                rule!("numeric addition", +(~~a:is_number:can_reduce) => reduce(~~a)),
+                rule!("numeric addition", +(~~a:is_number:can_reduce, ~~b:(!is_number,!is_empty)) => +(reduce(~~a), ~~b)),
                 rule!("identity addition", +(~~a:!is_zero:!is_empty, ~~b:is_zero:!is_empty) => ~~a),
-                rule!("combine terms", +(~~a::can_combine) => combine(~~a, +)),
+                rule!("combine terms", +(~~a::can_combine) => combine(~~a)),
+                rule!("identity minus", -(~a, ~b) => +(~a, *(-1, ~b))),
             ]),
             Self::Multiplication => RuleSet(vec![
                 rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b), false),
                 rule!("collapse multiplication", *(~a) => ~a, false),
-                rule!("numeric multiplication", *(~~a:is_number:can_reduce, ~~b:!is_number) => *(reduce(~~a, *), ~~b)),
+                rule!("numeric multiplication", *(~~a:is_number:can_reduce) => reduce(~~a)),
+                rule!("numeric multiplication", *(~~a:is_number:can_reduce, ~~b:(!is_number,!is_empty)) => *(reduce(~~a), ~~b)),
                 rule!("identity multiplication", *(~~a:!is_one:!is_empty, ~~b:is_one:!is_empty) => ~~a),
                 rule!("absorber multiplication", *(~~a::!is_empty, 0) => 0),
-                rule!("distributivity multiplication", *(~~a::!is_empty, +(~~b)) => distribute(~~b, ~~a, *)),
-                rule!("combine multiplication", *(~~a::can_combine) => combine(~~a, *)),
+                rule!("distributivity multiplication", *(~~a::!is_empty, +(~~b)) => distribute(*(+(~~b), ~~a))),
+                rule!("combine multiplication", *(~~a::can_combine) => combine(~~a)),
             ]),
             Self::Division => RuleSet(vec![
                 rule!("rational simplification", ~a:is_rational_reducible => rational_reduce(~a)),
                 rule!("division by zero", /(~a, 0) => Error("undefined")),
                 rule!("identity divide", /(~a, 1) => ~a),
-                rule!("create rational", /(~a:is_integer, ~b:(is_integer,!is_zero)) => create_rational(~a, ~b)),
+                rule!("create rational", /(~a:is_integer, ~b:(is_integer,!is_zero)) => create_rational(/(~a, ~b))),
             ]),
             Self::Powers => RuleSet(vec![
-                rule!("numeric power", ^(~a:(is_number,!is_zero,!is_one), ~b:(is_integer,!is_zero,!is_one)) => reduce(^(~a, ~b), ^)),
-                rule!("power expansion", ^(+(~~a), ~b:(is_integer,is_positive,!is_one)) => reduce(^(+(~~a), ~b), ^)),
+                rule!("numeric power", ^(~a:(is_number,!is_zero,!is_one), ~b:(is_integer,!is_zero,!is_one)) => reduce(^(~a, ~b))),
+                rule!("power expansion", ^(+(~~a), ~b:(is_integer,is_positive,!is_one)) => reduce(^(+(~~a), ~b))),
                 rule!("identity power", ^(~a, 1) => ~a),
                 rule!("absorber power", ^(~a:!is_zero, 0) => 1),
                 rule!("absorber power", ^(1, ~a) => 1),
@@ -77,18 +76,17 @@ impl Rules {
                 rule!("division by zero", ^(0, ~a::is_negative) => Error("undefined")),
                 rule!("undeterminate form 0^0", ^(0, 0) => Error("undefined")),
                 rule!("associativity power", ^(^(~a, ~b:!is_one), ~c:!is_one) => ^(~a, *(~b, ~c))),
-                rule!("distributivity power", ^(*(~~a), ~b:(is_integer,!is_one,!is_zero)) => distribute(~~a, ~b, ^)),
+                rule!("distributivity power", ^(*(~~a), ~b:(is_integer,!is_one,!is_zero)) => distribute(^(*(~~a), ~b))),
                 rule!("combine powers", ^(^(~a, ~b:(!is_one)), ~c) => ^(~a, *(~b, ~c))),
             ]),
             Self::Derivative => RuleSet(vec![
                 rule!("indepence", ~a::is_derivative_independent => 0),
-                rule!("linearity", D(*(~~a:is_value:!is_empty, ~~b:!is_value:!is_empty), ~x) => *(~~a, D(~~b, ~x))),
+                rule!("linearity", D(*(~~a:is_value:!is_empty, ~~b:!is_value:!is_empty), ~x) => *(~~a, D(*(~~b), ~x))),
                 rule!("identity", D(~x, ~x) => 1),
                 rule!("natural power", D(^(~x, ~n:(is_integer,!is_zero,!is_one)), ~x) => *(~n, ^(~x, +(~n, -1)))),
                 rule!("natural power", D(^(~y:!is_variable, ~n:(is_integer,!is_zero,!is_one)), ~x) => *(~n, ^(~y, +(~n, -1)), D(~y, ~x))),
-                rule!("additivity", D(+(~~a), ~x) => reduce(D(+(~~a), ~x), D)),
-                rule!("multiplicativity", D(*(~~a::can_reduce), ~x) => reduce(D(*(~~a), ~x), D)),
-
+                rule!("additivity", D(+(~~a), ~x) => reduce(D(+(~~a), ~x))),
+                rule!("multiplicativity", D(*(~~a::can_reduce), ~x) => reduce(D(*(~~a), ~x))),
             ]),
             Self::Trigonometry => RuleSet(vec![
                 // Trigonometry
@@ -141,13 +139,16 @@ impl Rules {
                 rule!("sin^2 + cos^2 = 1", +(^(Sin(~a), 2), ^(Cos(~a), 2)) => 1),
             ]),
             Self::FullExpand => Self::create_rulesets(&[
-                Self::Form,
                 Self::Addition,
                 Self::Multiplication,
                 Self::Division,
                 Self::Powers,
                 Self::Derivative,
                 Self::Trigonometry,
+            ]),
+            Self::Finalize => RuleSet(vec![
+                rule!("reorder terms", +(~~a::!is_sorted) => sort(~~a)),
+                rule!("reorder factors", *(~~a::!is_sorted) => sort(~~a)),
             ]),
         }
     }
@@ -156,6 +157,7 @@ impl Rules {
 fn main() {
     let cleanup_ruleset = Rules::Cleanup.create_ruleset();
     let expand_ruleset = Rules::FullExpand.create_ruleset();
+    let finalize_ruleset = Rules::Finalize.create_ruleset();
     loop {
         print!("calc > ");
         std::io::stdout().flush().unwrap();
@@ -165,15 +167,13 @@ fn main() {
             break;
         }
         let expr = Expression::from(input);
+        let expr = expr.apply_ruleset(&cleanup_ruleset, false);
         println!("Received: {}", expr);
-        println!("Received: {:?}", expr);
-
-        let expr = expr.apply_ruleset(&cleanup_ruleset, true);
-        println!("Parsed: {}", expr);
-        println!("Parsed: {:?}", expr);
+        //println!("Received: {:?}", expr);
 
         let expr = expr.apply_ruleset(&expand_ruleset, true);
+        let expr = expr.apply_ruleset(&finalize_ruleset, true);
         println!("Result: {}", expr);
-        println!("Result: {:?}", expr);
+        //println!("Result: {:?}", expr);
     }
 }

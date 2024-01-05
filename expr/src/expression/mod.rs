@@ -300,7 +300,7 @@ impl Expression {
                 }
             }
             Action::Map { map, .. } => {
-                map(&self.children[0].substitute_pattern(patterns), patterns)
+                map(&self.children[0].substitute_pattern(patterns))
             }
             _ => {
                 let mut children = vec![];
@@ -347,7 +347,7 @@ impl Expression {
                 break;
             }
         }
-        if print {
+        if print && cnt != 0 {
             println!("{} rule{} applied", cnt, if cnt == 1 { "" } else { "s" });
         }
         expr
@@ -355,29 +355,10 @@ impl Expression {
 
     pub(crate) fn apply_rule(&self, rule: &dyn Rule) -> Option<Expression> {
         if let Some(e) = rule.apply(self) {
-            if e == *self {
-                panic!("Rule {} is not simplifying expression", rule.name());
-            }
             Some(e)
         } else {
             for (i, c) in self.children.iter().enumerate() {
                 if let Some(e) = c.apply_rule(rule) {
-                    let mut children = self.children.clone();
-                    children[i] = e;
-                    return Some(Expression::new(children, self.action.clone()));
-                }
-            }
-            None
-        }
-    }
-
-    #[allow(dead_code)]
-    pub(crate) fn apply_rule_unchecked(&self, rule: &dyn Rule) -> Option<Expression> {
-        if let Some(e) = rule.apply(self) {
-            Some(e)
-        } else {
-            for (i, c) in self.children.iter().enumerate() {
-                if let Some(e) = c.apply_rule_unchecked(rule) {
                     let mut children = self.children.clone();
                     children[i] = e;
                     return Some(Expression::new(children, self.action.clone()));
@@ -536,7 +517,7 @@ impl std::fmt::Display for Expression {
             f.write_str("(")?;
             for i in 0..self.children.len() {
                 if i > 0 {
-                    f.write_str(", ")?;
+                    f.write_str(",")?;
                 }
                 f.write_str(&self.children[i].to_string())?;
             }
@@ -546,9 +527,7 @@ impl std::fmt::Display for Expression {
         } else {
             for i in 0..self.children.len() {
                 if i > 0 {
-                    f.write_str(" ")?;
                     f.write_str(&self.action.to_string())?;
-                    f.write_str(" ")?;
                 }
                 if self.children[i].action <= self.action {
                     f.write_str("(")?;

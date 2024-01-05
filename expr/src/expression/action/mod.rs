@@ -2,7 +2,7 @@ mod constant;
 mod function;
 mod number;
 
-use std::{collections::HashMap, hash::{Hash, Hasher}};
+use std::hash::{Hash, Hasher};
 
 use crate::{literals, Expression};
 pub use constant::Constant;
@@ -60,7 +60,7 @@ pub enum Action {
     /// Map from expression to expression
     Map {
         name: String,
-        map: &'static dyn Fn(&Expression, &HashMap<String, Expression>) -> Expression,
+        map: &'static dyn Fn(&Expression) -> Expression,
     },
 }
 
