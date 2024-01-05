@@ -607,7 +607,7 @@ impl std::fmt::Display for Expression {
             f.write_str(&self.action.to_string())?;
         } else {
             for i in 0..self.children.len() {
-                if i > 0 && self.action != Action::Mul {
+                if i > 0 {
                     f.write_str(&self.action.to_string())?;
                 }
                 if self.children[i].action <= self.action {

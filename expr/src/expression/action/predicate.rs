@@ -220,9 +220,15 @@ pub(crate) fn is_sorted(expr: &Expression) -> bool {
         true
     } else if let Action::Mul = expr.action {
         for (i, c) in expr.children.iter().enumerate().skip(1) {
+            if is_value(&expr.children[i - 1]) {
+                continue;
+            }
+            if is_value(c) {
+                return false;
+            }
             let a = c.count_variables();
-            let b = expr.children[i - 1].count_variables();
-            if a.iter().sum::<usize>() == 0 || (a > b && b.iter().sum::<usize>() != 0) {
+            let b = expr.children[i - 1].count_variables(); 
+            if a > b {
                 return false;
             }
         }

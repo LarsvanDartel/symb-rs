@@ -291,16 +291,14 @@ pub(crate) fn combine(e: &Expression) -> Expression {
 pub(crate) fn sort(e: &Expression) -> Expression {
     let mut res = e.children.clone();
     if e.action == Action::Mul {
-        res.sort_by(|a, b| {
-            if is_value(a) {
-                std::cmp::Ordering::Less
-            } else if is_value(b) {
-                std::cmp::Ordering::Greater
-            } else {
-                let a = a.count_variables();
-                let b = b.count_variables();
-                b.cmp(&a)
-            }
+        res.sort_by(|a, b| if is_value(a) {
+            std::cmp::Ordering::Less
+        } else if is_value(b) {
+            std::cmp::Ordering::Greater
+        } else {
+            let a = a.count_variables();
+            let b = b.count_variables();
+            b.cmp(&a)
         });
     } else if e.action == Action::Add {
         res.sort_by(|a, b| {
