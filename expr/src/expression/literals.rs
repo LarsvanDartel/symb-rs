@@ -460,7 +460,7 @@ pub mod maps {
         pub fn combine(e: &Expression, _: &HashMap<String, Expression>, action: Action) -> Expression {
             if let Action::Add | Action::Mul = action {
                 assert_eq!(e.action, action);
-                let mut cnt: HashMap<Expression, Vec<(usize, Option<Expression>)>>   = HashMap::new();
+                let mut cnt = HashMap::new();
                 let mut res = vec![];
                 for (i, c) in e.children.iter().enumerate() {
                     let p = part(c, &e.action);
@@ -468,13 +468,7 @@ pub mod maps {
                         res.push(c.clone());
                         continue;
                     }
-                    let part = p.0.unwrap();
-                    let prev_part = cnt.keys().find(|p2| p2 == &&part);
-                    if let Some(prev_part) = prev_part {
-                        cnt.entry(prev_part.clone()).and_modify(|v| v.push((i, p.1)));
-                    } else {
-                        cnt.insert(part, vec![(i, p.1)]);
-                    }
+                    cnt.entry(p.0.unwrap()).or_insert_with(Vec::new).push((i, p.1));
                 }
                 for (p, indices) in cnt {
                     if indices.len() == 1 {

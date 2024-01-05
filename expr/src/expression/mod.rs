@@ -5,11 +5,10 @@ mod parser;
 pub use action::{Action, Constant, Function, Number};
 pub use literals::{maps, predicates};
 use parser::Parser;
-use std::{collections::HashMap, str::FromStr};
-
+use std::{collections::HashMap, str::FromStr, hash::{Hash, Hasher, DefaultHasher}};
 use crate::{Rule, RuleSet};
 
-#[derive(Clone, Hash)]
+#[derive(Clone)]
 pub struct Expression {
     children: Vec<Expression>,
     action: Action,
@@ -503,6 +502,27 @@ impl PartialEq for Expression {
 }
 
 impl Eq for Expression {}
+
+impl Hash for Expression {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.action.hash(state);
+        if let Action::Add | Action::Mul = self.action {
+            let mut children = self.children.clone();
+            // xor the hashes of the children to make the hash order-independent
+            let mut hash = 0;
+            for c in &mut children {
+                let mut h = DefaultHasher::new();
+                c.hash(&mut h);
+                hash ^= h.finish();
+            }
+            hash.hash(state);
+        } else {
+            for c in &self.children {
+                c.hash(state);
+            }
+        }
+    }
+}
 
 impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
