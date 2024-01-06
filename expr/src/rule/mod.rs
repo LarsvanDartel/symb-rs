@@ -54,14 +54,14 @@ impl Rule for MatchRule {
         if self.pattern.matches(expr, &mut patterns) {
             Some(self.replacement.substitute_pattern(&patterns))
         } else {
-            if !patterns.is_empty() {
-                println!("{:?}", self);
-                println!("{:?}", expr);
-                for (key, value) in patterns {
-                    println!("{} => {}", key, value);
-                }
-                panic!("Pattern matching failed, but patterns were found")
-            }
+            //if !patterns.is_empty() {
+            //    println!("{:?}", self);
+            //    println!("{:?}", expr);
+            //    for (key, value) in patterns {
+            //        println!("{} => {}", key, value);
+            //    }
+            //    panic!("Pattern matching failed, but patterns were found")
+            //}
             None
         }
     }

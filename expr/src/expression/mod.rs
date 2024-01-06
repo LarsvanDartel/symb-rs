@@ -321,25 +321,23 @@ impl Expression {
             (_, Action::Slot { .. }) | (_, Action::Segment { .. }) => false,
             (Action::Slot { name, predicate }, _) => {
                 if let Some(expr) = patterns.get(name) {
-                    return expr.clone().matches(other, patterns);
+                    expr.clone().matches(other, patterns)
+                } else if !predicate.matches(other) {
+                    false
+                } else {
+                    patterns.insert(name.clone(), other.clone());
+                    true
                 }
-                if !predicate.matches(other) {
-                    patterns.clear();
-                    return false;
-                }
-                patterns.insert(name.clone(), other.clone());
-                true
             }
             (Action::Segment { name, min_size, .. }, _) => {
                 if let Some(expr) = patterns.get(name) {
-                    return expr.clone().matches(other, patterns);
+                    expr.clone().matches(other, patterns)
+                } else if other.children.len() < *min_size {
+                    false
+                } else {
+                    patterns.insert(name.clone(), other.clone());
+                    true
                 }
-                if other.children.len() < *min_size {
-                    patterns.clear();
-                    return false;
-                }
-                patterns.insert(name.clone(), other.clone());
-                true
             }
             (Action::Add, Action::Add) => self.match_children_unordered(other, patterns),
             (Action::Mul, Action::Mul) => self.match_children_unordered(other, patterns),
@@ -356,16 +354,17 @@ impl Expression {
                     .iter()
                     .any(|c| matches!(c.action, Action::Num { .. }))
                 {
-                    return false;
+                    false
+                } else {
+                    self.matches(
+                        &Expression::new_binary(
+                            other.clone(),
+                            Expression::create_value(action::Number::Int(1)),
+                            Action::Pow,
+                        ),
+                        patterns,
+                    )
                 }
-                self.matches(
-                    &Expression::new_binary(
-                        other.clone(),
-                        Expression::create_value(action::Number::Int(1)),
-                        Action::Pow,
-                    ),
-                    patterns,
-                )
             }
             _ => false,
         }
@@ -384,11 +383,27 @@ impl Expression {
             _ => {
                 let mut children = vec![];
                 for c in &self.children {
+                    if let Action::Mul = self.action {
+                        if let Action::Fun(Function::D) = c.action {
+                            if let Action::Slot { name: n0, .. } = &c.children[0].action {
+                                if let Action::Slot{ name: n1, .. } = &c.children[1].action {
+                                    if patterns.get(n0) == patterns.get(n1) {
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                    }
                     if let Action::Err(_) = c.action {
                         return c.clone();
                     }
                     if let Action::Segment { .. } = c.action {
-                        children.extend(c.substitute_pattern(patterns).children);
+                        let c = c.substitute_pattern(patterns);
+                        if c.action == self.action {
+                            children.extend(c.children);
+                        } else {
+                            children.push(c);
+                        }
                     } else {
                         children.push(c.substitute_pattern(patterns));
                     }
@@ -396,6 +411,9 @@ impl Expression {
                 if let Action::Add | Action::Mul = self.action {
                     if children.is_empty() {
                         return self.action.identity();
+                    }
+                    if children.len() == 1 {
+                        return children.pop().unwrap()
                     }
                 }
                 Expression::new(children, self.action.clone())
