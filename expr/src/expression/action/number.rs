@@ -1,6 +1,8 @@
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
+use crate::literals::{to_superscript, to_subscript};
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Number {
     /// Integer
@@ -136,7 +138,11 @@ impl std::fmt::Display for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
             Number::Int(int) => f.write_str(&int.to_string()),
-            Number::Rational(num, den) => f.write_str(&format!("({}/{})", num, den)),
+            Number::Rational(num, den) => {
+                let num = to_superscript(num.to_string());
+                let den = to_subscript(den.to_string());
+                f.write_str(&format!("{}⁄{}", num, den))
+            }
             Number::Real(real) => f.write_str(&real.to_string()),
         }
     }

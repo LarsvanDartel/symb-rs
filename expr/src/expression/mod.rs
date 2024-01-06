@@ -5,6 +5,7 @@ mod parser;
 use crate::{Rule, RuleSet};
 pub use action::{Action, Constant, Function, Map, Number, Predicate, PredicateType};
 use parser::Parser;
+use literals::to_superscript;
 use std::{
     collections::HashMap,
     hash::{DefaultHasher, Hash, Hasher},
@@ -611,11 +612,21 @@ impl Hash for Expression {
 
 impl std::fmt::Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Action::Fun(_) = self.action {
+        if let Action::Fun(fun) = &self.action {
+            let mut ignore = false;
+            if let Function::Root = fun {
+                if let Action::Num { value: Number::Int(i) } = &self.children[0].action {
+                    f.write_str(&to_superscript(i.to_string()))?;
+                    ignore = true;
+                }
+            }
             f.write_str(&self.action.to_string())?;
             f.write_str("(")?;
             for i in 0..self.children.len() {
-                if i > 0 {
+                if ignore && i == 0 {
+                    continue;
+                }
+                if i > 0 && !ignore {
                     f.write_str(",")?;
                 }
                 f.write_str(&self.children[i].to_string())?;

@@ -11,6 +11,7 @@ pub const SIN: &str = "Sin";
 pub const COS: &str = "Cos";
 pub const TAN: &str = "Tan";
 pub const SQRT: &str = "Sqrt";
+pub const SQRT_SHORT: &str = "√";
 pub const ROOT: &str = "Root";
 pub const EXP: &str = "Exp";
 pub const LN: &str = "Ln";
@@ -44,4 +45,42 @@ pub const fn matching_parentheses(c: char) -> Option<char> {
         '}' => Some('{'),
         _ => None,
     }
+}
+
+pub fn to_superscript(s: String) -> String {
+    s.chars()
+        .map(|c| match c {
+            '0' => '⁰',
+            '1' => '¹',
+            '2' => '²',
+            '3' => '³',
+            '4' => '⁴',
+            '5' => '⁵',
+            '6' => '⁶',
+            '7' => '⁷',
+            '8' => '⁸',
+            '9' => '⁹',
+            '-' => '⁻',
+            _ => c,
+        })
+        .collect()
+}
+
+pub fn to_subscript(s: String) -> String {
+    s.chars()
+        .map(|c| match c {
+            '0' => '₀',
+            '1' => '₁',
+            '2' => '₂',
+            '3' => '₃',
+            '4' => '₄',
+            '5' => '₅',
+            '6' => '₆',
+            '7' => '₇',
+            '8' => '₈',
+            '9' => '₉',
+            '-' => '₋',
+            _ => c,
+        })
+        .collect()
 }
