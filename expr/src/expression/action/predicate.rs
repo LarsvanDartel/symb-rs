@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::{Action, Expression, Function, Number};
-use num_integer::Integer;
+use num_integer::{Integer, Roots};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Predicate {
@@ -35,6 +35,7 @@ pub enum PredicateType {
     IsValue,
     IsVariable,
     IsRationalReducible,
+    IsRootReducible,
     CanCombine,
     IsDerivativeIndependent,
     IsSorted,
@@ -58,6 +59,7 @@ impl PredicateType {
             Self::IsValue => is_value(expr),
             Self::IsVariable => is_variable(expr),
             Self::IsRationalReducible => is_rational_reducible(expr),
+            Self::IsRootReducible => is_root_reducible(expr),
             Self::CanCombine => can_combine(expr),
             Self::IsDerivativeIndependent => is_derivative_independent(expr),
             Self::IsSorted => is_sorted(expr),
@@ -85,6 +87,7 @@ impl FromStr for PredicateType {
             "is_value" => Ok(Self::IsValue),
             "is_variable" => Ok(Self::IsVariable),
             "is_rational_reducible" => Ok(Self::IsRationalReducible),
+            "is_root_reducible" => Ok(Self::IsRootReducible),
             "can_combine" => Ok(Self::CanCombine),
             "is_derivative_independent" => Ok(Self::IsDerivativeIndependent),
             "is_sorted" => Ok(Self::IsSorted),
@@ -173,6 +176,56 @@ pub(crate) fn is_rational_reducible(expr: &Expression) -> bool {
     matches!(expr.action, Action::Num { value: Number::Rational(num, den) } if num.gcd(&den) != 1)
 }
 
+pub(crate) fn is_root_reducible(expr: &Expression) -> bool {
+    let (base, num) = if let Action::Fun(Function::Sqrt) = expr.action {
+        (2, &expr.children[0])
+    } else if let Action::Fun(Function::Root) = expr.action {
+        if let Action::Num {
+            value: Number::Int(i),
+        } = expr.children[0].action
+        {
+            (i, &expr.children[1])
+        } else {
+            return false;
+        }
+    } else if let Action::Pow = expr.action {
+        return matches!(
+            expr.children[0].action,
+            Action::Num {
+                value: Number::Int(_)
+            }
+        ) && matches!(
+            expr.children[1].action,
+            Action::Num {
+                value: Number::Rational(_, _)
+            }
+        ) && !is_rational_reducible(&expr.children[1]);
+    } else {
+        return false;
+    };
+
+    let num = if let Action::Num { value } = num.action {
+        value
+    } else {
+        return false;
+    };
+
+    match num {
+        Number::Int(i) => is_perfect_root(i, base),
+        Number::Rational(num, den) => is_perfect_root(num, base) && is_perfect_root(den, base),
+        _ => true,
+    }
+}
+
+/// Computes the `n`-th root of `num` if it is an integer.
+fn is_perfect_root(num: i64, n: i64) -> bool {
+    if num < 0 && n % 2 == 0 || n <= 0 {
+        return false;
+    }
+    let root = num.nth_root(n as u32);
+    root.pow(n as u32) == num
+}
+
 pub(crate) fn can_combine(expr: &Expression) -> bool {
     if let Action::Add | Action::Mul = expr.action {
         for (i, c1) in expr.children.iter().enumerate() {
@@ -227,7 +280,7 @@ pub(crate) fn is_sorted(expr: &Expression) -> bool {
                 return false;
             }
             let a = c.count_variables();
-            let b = expr.children[i - 1].count_variables(); 
+            let b = expr.children[i - 1].count_variables();
             if a > b {
                 return false;
             }

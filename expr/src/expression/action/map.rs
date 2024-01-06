@@ -1,13 +1,14 @@
 use std::{collections::HashMap, str::FromStr};
 
 use super::predicate::{is_integer, is_number, is_one, is_value, is_zero};
-use crate::{Action, Expression, Function, Number};
-use num_integer::Integer;
+use crate::{Action, Expression, Function, Number, expression::action::predicate::is_root_reducible};
+use num_integer::{Integer, Roots};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Map {
     Reduce,
     RationalReduce,
+    RootReduce,
     CreateRational,
     Distribute,
     Combine,
@@ -19,6 +20,7 @@ impl Map {
         match self {
             Self::Reduce => reduce(&expr),
             Self::RationalReduce => rational_reduce(&expr),
+            Self::RootReduce => root_reduce(&expr),
             Self::CreateRational => create_rational(&expr),
             Self::Distribute => distribute(&expr),
             Self::Combine => combine(&expr),
@@ -34,6 +36,7 @@ impl FromStr for Map {
         match s {
             "reduce" => Ok(Self::Reduce),
             "rational_reduce" => Ok(Self::RationalReduce),
+            "root_reduce" => Ok(Self::RootReduce),
             "create_rational" => Ok(Self::CreateRational),
             "distribute" => Ok(Self::Distribute),
             "combine" => Ok(Self::Combine),
@@ -182,6 +185,77 @@ pub(crate) fn rational_reduce(e: &Expression) -> Expression {
         }
     } else {
         panic!("Expected rational number, got {:?}", e);
+    }
+}
+
+pub(crate) fn root_reduce(e: &Expression) -> Expression {
+    assert!(is_root_reducible(e));
+    let (base, num) = if let Action::Fun(Function::Sqrt) = e.action {
+        (2, &e.children[0])
+    } else if let Action::Fun(Function::Root) = e.action {
+        if let Action::Num { value: Number::Int(i) } = e.children[0].action {
+            (i, &e.children[1])
+        } else {
+            panic!("Expected integer, got {:?}", e.children[0]);
+        }
+    } else if let Action::Pow = e.action {
+        let (base, pow) = if let Action::Num { value: Number::Rational(num, den) } = e.children[1].action {
+            (den, num)
+        } else {
+            panic!("Expected rational number, got {:?}", e.children[1]);
+        };
+
+        let num = if let Action::Num { value: Number::Int(i) } = e.children[0].action {
+            if pow == 1 {
+                Expression::create_value(Number::Int(i))
+            } else {
+                Expression::new_binary(
+                    Expression::create_value(i),
+                    Expression::create_value(pow),
+                    Action::Pow,
+                )
+            }
+        } else {
+            panic!("Expected integer, got {:?}", e.children[0]);
+        };
+
+        return if base == 2 {
+            Expression::create_function(Function::Sqrt, vec![num])
+        } else {
+            Expression::create_function(
+                Function::Root,
+                vec![Expression::create_value(base), num],
+            )
+        };
+    } else {
+        panic!("Expected root, got {:?}", e);
+    };
+
+    let num = if let Action::Num { value } = num.action {
+        value
+    } else {
+        panic!("Expected number, got {:?}", num);
+    };
+
+    match num {
+        Number::Int(i) => Expression::create_value(i.nth_root(base as u32)),
+        Number::Rational(num, den) => {Expression::new_binary(
+            create_root(base, num),
+            create_root(base, den),
+            Action::Div,
+        )},
+        Number::Real(f) => Expression::create_value(f.powf(1.0 / base as f64)),
+    }
+}
+
+fn create_root(base: i64, num: i64) -> Expression {
+    if base == 2 {
+        Expression::create_function(Function::Sqrt, vec![Expression::create_value(num)])
+    } else {
+        Expression::create_function(
+            Function::Root,
+            vec![Expression::create_value(base), Expression::create_value(num)],
+        )
     }
 }
 
