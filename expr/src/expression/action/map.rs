@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str::FromStr};
 
 use super::predicate::{
-    is_integer, is_integral, is_number, is_one, is_root_reducible, is_value, is_zero,
+    is_integer, is_integral, is_number, is_one, is_root_reducible, is_value, is_zero, is_nonnegative,
 };
 use crate::{Action, Expression, Function, Number};
 use num_integer::{Integer, Roots};
@@ -16,6 +16,7 @@ pub enum Map {
     Combine,
     Sort,
     IndependentIntegrate,
+    Abs,
 }
 
 impl Map {
@@ -29,6 +30,7 @@ impl Map {
             Self::Combine => combine(&expr),
             Self::Sort => sort(&expr),
             Self::IndependentIntegrate => independent_integrate(&expr),
+            Self::Abs => abs(&expr),
         }
     }
 }
@@ -46,6 +48,7 @@ impl FromStr for Map {
             "combine" => Ok(Self::Combine),
             "sort" => Ok(Self::Sort),
             "independent_integrate" => Ok(Self::IndependentIntegrate),
+            "abs" => Ok(Self::Abs),
             _ => Err(()),
         }
     }
@@ -420,4 +423,22 @@ pub(crate) fn independent_integrate(e: &Expression) -> Expression {
     };
 
     Expression::create_function(Function::Int, vec![f, var.clone()])
+}
+
+pub(crate) fn abs(e: &Expression) -> Expression {
+    if let Action::Num { value } = e.action {
+        match value {
+            Number::Int(n) => Expression::create_value(n.abs()),
+            Number::Rational(num, den) => Expression::create_value((num.abs(), den.abs())),
+            Number::Real(f) => Expression::create_value(f.abs()),
+        }
+    } else if let Action::Const(c) = &e.action {
+        if is_nonnegative(&Expression::create_value(Number::from(*c))) {
+            e.clone()
+        } else {
+            -e.clone()
+        }
+    } else {
+        panic!("Expected value, got {}", e);
+    }
 }

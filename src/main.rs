@@ -26,6 +26,7 @@ enum Rules {
     Logarithm,
     Sqrt,
     Trigonometry,
+    Abs,
     Finalize,
 }
 
@@ -180,6 +181,9 @@ impl Rules {
                 rule!("periodicity tan", Tan(+(*(~a:(is_integer,!is_zero), Pi), ~~b)) => Tan(~~b)),
                 rule!("sin^2 + cos^2 = 1", +(^(Sin(~a), 2), ^(Cos(~a), 2)) => 1),
             ]),
+            Self::Abs => RuleSet(vec![
+                rule!("evaluate the absolute value", Abs(~n:is_value) => abs(~n)),
+            ]),
             Self::FullExpand => Self::create_rulesets(&[
                 Self::Form,
                 Self::Addition,
@@ -191,6 +195,7 @@ impl Rules {
                 Self::Logarithm,
                 Self::Sqrt,
                 Self::Trigonometry,
+                Self::Abs,
             ]),
             Self::Finalize => RuleSet(vec![rule!("reorder terms", ~a:!is_sorted => sort(~a))]),
         } 

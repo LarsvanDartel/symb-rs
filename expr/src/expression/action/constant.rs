@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::{literals, Number};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Constant {
     /// Pi
     Pi,
