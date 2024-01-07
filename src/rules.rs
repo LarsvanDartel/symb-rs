@@ -117,8 +117,8 @@ impl Rules {
                 rule!("ln(e^x)=x", Ln(*(E, ~~x)) => +(1, Ln(~~x))),
                 rule!("log(a) + log(b) = log(ab)", +(Ln(~a), Ln(~b), ~~c) => +(Ln(*(~a, ~b)), ~~c)),
                 rule!("log(a) + log(b) = log(ab)", +(Log(~base, ~a), Log(~base, ~b), ~~c) => +(Log(~base, *(~a, ~b)), ~~c)),
-                rule!("n * log(a) = log(a^n)", *(~n:is_integer, Ln(~a), ~~b) => *(Ln(^(~a, ~n)), ~~b)),
-                rule!("n * log(a) = log(a^n)", *(~n:is_integer, Log(~base, ~a), ~~b) => *(Log(~base, ^(~a, ~n)), ~~b)),
+                rule!("n * log(a) = log(a^n)", *(~n:(is_integer,!is_one), Ln(~a), ~~b) => *(Ln(^(~a, ~n)), ~~b)),
+                rule!("n * log(a) = log(a^n)", *(~n:(is_integer,!is_one), Log(~base, ~a), ~~b) => *(Log(~base, ^(~a, ~n)), ~~b)),
             ]),
             Self::Sqrt => RuleSet(vec![
                 rule!("domain sqrt", Sqrt(~a:is_negative) => Error("domain sqrt")),
