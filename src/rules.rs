@@ -117,7 +117,6 @@ impl Rules {
                 rule!("rational simplification", ~a:is_rational_reducible => rational_reduce(~a)),
                 rule!("division by zero", /(~a, 0) => Error("undefined")),
                 rule!("identity divide", /(~a, 1) => ~a),
-                rule!("create rational", /(~a:is_integer, ~b:(is_integer && !is_zero)) => create_rational(/(~a, ~b))),
             ]),
             Self::Powers => RuleSet(vec![
                 rule!("numeric power", ^(~a:(is_number && !is_zero && !is_one), ~b:(is_integer && !is_zero && !is_one)) => reduce(^(~a, ~b))),
@@ -234,7 +233,7 @@ impl Rules {
                 rule!("unit circle tan", Tan(*(5/6, Pi)) => *(-1/3, Sqrt(3))),
                 rule!("periodicity tan", Tan(Pi) => Tan(0)),
                 rule!("periodicity tan", Tan(+(*(~a:(is_integer && !is_zero), Pi), ~~b)) => Tan(~~b)),
-                rule!("sin^2 + cos^2 = 1", +(^(Sin(~a), 2), ^(Cos(~a), 2)) => 1),
+                rule!("sin^2 + cos^2 = 1", +(^(Sin(~a), 2), ^(Cos(~a), 2), ~~c) => +(1, ~~c)),
             ]),
             Self::Misc => RuleSet(vec![
                 rule!("abs", Abs(~n:is_value) => abs(~n)),
@@ -258,7 +257,8 @@ impl Rules {
                 rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b), false),
                 rule!("collapse addition", +(~a) => ~a, false),
                 rule!("collapse multiplication", *(~a) => ~a, false),
-                rule!("reorder terms", ~a:!is_sorted => sort(~a), false)
+                rule!("reorder terms", ~a:!is_sorted => sort(~a), false),
+                rule!("create rational", /(~a:is_integer, ~b:(is_integer && !is_zero)) => create_rational(/(~a, ~b)), false),
             ]),
         }
     }

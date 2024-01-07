@@ -368,10 +368,7 @@ impl Expression {
         }
     }
 
-    pub(crate) fn matches_final(
-        &self,
-        patterns: &HashMap<String, Expression>,
-    ) -> bool {
+    pub(crate) fn matches_final(&self, patterns: &HashMap<String, Expression>) -> bool {
         let expr = self.substitute_pattern(patterns);
         expr.eval_predicates()
     }
@@ -397,14 +394,50 @@ impl Expression {
             _ => {
                 let mut children = vec![];
                 for c in &self.children {
-                    if let Action::Mul = self.action {
-                        if let Action::Fun(Function::D) = c.action {
+                    if Action::Mul == self.action {
+                        if let Action::Slot { name, .. } = &c.action {
+                            if matches!(
+                                patterns.get(name).map(|e| &e.action),
+                                Some(Action::Num {
+                                    value: Number::Int(1)
+                                })
+                            ) {
+                                continue;
+                            }
+                        } else if c.action == Action::Fun(Function::D) {
                             if let Action::Slot { name: n0, .. } = &c.children[0].action {
                                 if let Action::Slot { name: n1, .. } = &c.children[1].action {
                                     if patterns.get(n0) == patterns.get(n1) {
                                         continue;
                                     }
                                 }
+                            }
+                        } else if let Action::Div = c.action {
+                            if matches!(
+                                c.children[0].action,
+                                Action::Num {
+                                    value: Number::Int(1)
+                                }
+                            ) {
+                                if let Action::Slot { name, .. } = &c.children[1].action {
+                                    if matches!(
+                                        patterns.get(name).map(|e| &e.action),
+                                        Some(Action::Num {
+                                            value: Number::Int(1)
+                                        })
+                                    ) {
+                                        continue;
+                                    }
+                                }
+                            }
+                        }
+                    } else if Action::Add == self.action {
+                        if let Action::Slot { name, .. } = &c.action {
+                            if let Some(Action::Num {
+                                value: Number::Int(0),
+                            }) = patterns.get(name).map(|e| &e.action)
+                            {
+                                continue;
                             }
                         }
                     }
