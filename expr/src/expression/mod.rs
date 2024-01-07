@@ -231,7 +231,6 @@ impl Expression {
                         continue;
                     }
                     if other_matched[i] {
-                        patterns.clear();
                         return false;
                     }
                     possible_matches[j].push(i);
@@ -248,7 +247,6 @@ impl Expression {
                         continue;
                     }
                     if other_matched[i] {
-                        patterns.clear();
                         return false;
                     }
                     possible_matches[j].push(i);
@@ -270,7 +268,7 @@ impl Expression {
                 possible_matches[i]
                     .first()
                     .map(|&j| other.children[j].clone())
-                    .unwrap_or(Expression::new_empty(other.action.clone()))
+                    .unwrap_or(other.action.identity())
             } else if let Action::Segment { .. } = p.action {
                 Expression::new(
                     possible_matches[i]
@@ -305,7 +303,6 @@ impl Expression {
 
         for i in 0..self.children.len() {
             if !self.children[i].matches(&other.children[i], patterns) {
-                patterns.clear();
                 return false;
             }
         }
