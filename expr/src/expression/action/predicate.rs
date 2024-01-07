@@ -38,6 +38,7 @@ pub enum PredicateType {
     IsRootReducible,
     CanCombine,
     IsDerivativeIndependent,
+    IsIntegralIndependent,
     IsSorted,
 }
 
@@ -61,7 +62,8 @@ impl PredicateType {
             Self::IsRationalReducible => is_rational_reducible(expr),
             Self::IsRootReducible => is_root_reducible(expr),
             Self::CanCombine => can_combine(expr),
-            Self::IsDerivativeIndependent => is_derivative_independent(expr),
+            Self::IsDerivativeIndependent => is_derivative(expr) && is_independent(expr),
+            Self::IsIntegralIndependent => is_integral(expr) && is_independent(expr),
             Self::IsSorted => is_sorted(expr),
         }
     }
@@ -90,6 +92,7 @@ impl FromStr for PredicateType {
             "is_root_reducible" => Ok(Self::IsRootReducible),
             "can_combine" => Ok(Self::CanCombine),
             "is_derivative_independent" => Ok(Self::IsDerivativeIndependent),
+            "is_integral_independent" => Ok(Self::IsIntegralIndependent),
             "is_sorted" => Ok(Self::IsSorted),
             _ => Err(()),
         }
@@ -119,21 +122,15 @@ pub(crate) fn is_rational(expr: &Expression) -> bool {
 }
 
 pub(crate) fn is_zero(expr: &Expression) -> bool {
-    matches!(
-        expr.action,
-        Action::Num {
-            value: Number::Int(0)
-        }
-    )
+    expr.action == Action::Num {
+        value: Number::Int(0)
+    }
 }
 
 pub(crate) fn is_one(expr: &Expression) -> bool {
-    matches!(
-        expr.action,
-        Action::Num {
-            value: Number::Int(1)
-        }
-    )
+    expr.action == Action::Num {
+        value: Number::Int(1)
+    }
 }
 
 pub(crate) fn is_even(expr: &Expression) -> bool {
@@ -172,14 +169,22 @@ pub(crate) fn is_variable(expr: &Expression) -> bool {
     matches!(expr.action, Action::Var { .. })
 }
 
+pub(crate) fn is_derivative(expr: &Expression) -> bool {
+    expr.action == Action::Fun(Function::D)
+}
+
+pub(crate) fn is_integral(expr: &Expression) -> bool {
+    expr.action == Action::Fun(Function::Int)
+}
+
 pub(crate) fn is_rational_reducible(expr: &Expression) -> bool {
     matches!(expr.action, Action::Num { value: Number::Rational(num, den) } if num.gcd(&den) != 1)
 }
 
 pub(crate) fn is_root_reducible(expr: &Expression) -> bool {
-    let (base, num) = if let Action::Fun(Function::Sqrt) = expr.action {
+    let (base, num) = if Action::Fun(Function::Sqrt) == expr.action {
         (2, &expr.children[0])
-    } else if let Action::Fun(Function::Root) = expr.action {
+    } else if Action::Fun(Function::Root) == expr.action {
         if let Action::Num {
             value: Number::Int(i),
         } = expr.children[0].action
@@ -188,7 +193,7 @@ pub(crate) fn is_root_reducible(expr: &Expression) -> bool {
         } else {
             return false;
         }
-    } else if let Action::Pow = expr.action {
+    } else if Action::Pow == expr.action {
         return matches!(
             expr.children[0].action,
             Action::Num {
@@ -227,7 +232,7 @@ fn is_perfect_root(num: i64, n: i64) -> bool {
 }
 
 pub(crate) fn can_combine(expr: &Expression) -> bool {
-    if let Action::Add | Action::Mul = expr.action {
+    if expr.action == Action::Add || expr.action == Action::Mul {
         for (i, c1) in expr.children.iter().enumerate() {
             let p1 = c1.split(&expr.action).0;
             if p1.is_none() {
@@ -245,8 +250,8 @@ pub(crate) fn can_combine(expr: &Expression) -> bool {
     }
 }
 
-pub(crate) fn is_derivative_independent(expr: &Expression) -> bool {
-    if let Action::Fun(Function::D) = expr.action {
+pub(crate) fn is_independent(expr: &Expression) -> bool {
+    if is_derivative(expr) || is_integral(expr) {
         assert_eq!(expr.children.len(), 2);
         let var = if let Action::Var { name } = &expr.children[1].action {
             name
@@ -260,7 +265,7 @@ pub(crate) fn is_derivative_independent(expr: &Expression) -> bool {
 }
 
 pub(crate) fn is_sorted(expr: &Expression) -> bool {
-    if let Action::Add = expr.action {
+    if Action::Add == expr.action {
         for (i, c) in expr.children.iter().enumerate().skip(1) {
             let a = c.count_variables();
             let b = expr.children[i - 1].count_variables();
@@ -271,7 +276,7 @@ pub(crate) fn is_sorted(expr: &Expression) -> bool {
             }
         }
         true
-    } else if let Action::Mul = expr.action {
+    } else if Action::Mul == expr.action {
         for (i, c) in expr.children.iter().enumerate().skip(1) {
             if is_value(&expr.children[i - 1]) {
                 continue;

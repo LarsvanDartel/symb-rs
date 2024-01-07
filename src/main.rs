@@ -22,6 +22,7 @@ enum Rules {
     Division,
     Powers,
     Derivative,
+    Integration,
     Logarithm,
     Sqrt,
     Trigonometry,
@@ -84,7 +85,7 @@ impl Rules {
                 rule!("combine powers", ^(^(~a, ~b:(!is_one)), ~c) => ^(~a, *(~b, ~c))),
             ]),
             Self::Derivative => RuleSet(vec![
-                rule!("indepence", ~a:is_derivative_independent => 0),
+                rule!("independence", ~a:is_derivative_independent => 0),
                 rule!("linearity", D(*(~~a:is_value:1, ~~b:!is_value:1), ~x) => *(~~a, D(~~b, ~x))),
                 rule!("identity", D(~x, ~x) => 1),
                 rule!("additivity", D(+(~~a), ~x) => reduce(D(~~a, ~x))),
@@ -101,6 +102,9 @@ impl Rules {
                 rule!("derivative of sin", D(Sin(~y), ~x) => *(D(~y, ~x), Cos(~y))),
                 rule!("derivative of cos", D(Cos(~y), ~x) => *(-1, D(~y, ~x), Sin(~y))),
                 rule!("derivative of tan", D(Tan(~y), ~x) => *(D(~y, ~x), ^(Cos(~y), -2))),
+            ]),
+            Self::Integration => RuleSet(vec![
+                rule!("independence", ~a:is_integral_independent => independent_integrate(~a)),
             ]),
             Self::Logarithm => RuleSet(vec![
                 rule!("domain log", Ln(~a:is_nonpositive) => Error("domain log")),
@@ -183,12 +187,13 @@ impl Rules {
                 Self::Division,
                 Self::Powers,
                 Self::Derivative,
+                Self::Integration,
                 Self::Logarithm,
                 Self::Sqrt,
                 Self::Trigonometry,
             ]),
             Self::Finalize => RuleSet(vec![rule!("reorder terms", ~a:!is_sorted => sort(~a))]),
-        }
+        } 
     }
 }
 

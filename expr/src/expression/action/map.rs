@@ -1,7 +1,9 @@
 use std::{collections::HashMap, str::FromStr};
 
-use super::predicate::{is_integer, is_number, is_one, is_value, is_zero};
-use crate::{Action, Expression, Function, Number, expression::action::predicate::is_root_reducible};
+use super::predicate::{
+    is_integer, is_integral, is_number, is_one, is_root_reducible, is_value, is_zero,
+};
+use crate::{Action, Expression, Function, Number};
 use num_integer::{Integer, Roots};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -13,6 +15,7 @@ pub enum Map {
     Distribute,
     Combine,
     Sort,
+    IndependentIntegrate,
 }
 
 impl Map {
@@ -25,6 +28,7 @@ impl Map {
             Self::Distribute => distribute(&expr),
             Self::Combine => combine(&expr),
             Self::Sort => sort(&expr),
+            Self::IndependentIntegrate => independent_integrate(&expr),
         }
     }
 }
@@ -41,6 +45,7 @@ impl FromStr for Map {
             "distribute" => Ok(Self::Distribute),
             "combine" => Ok(Self::Combine),
             "sort" => Ok(Self::Sort),
+            "independent_integrate" => Ok(Self::IndependentIntegrate),
             _ => Err(()),
         }
     }
@@ -193,19 +198,28 @@ pub(crate) fn root_reduce(e: &Expression) -> Expression {
     let (base, num) = if let Action::Fun(Function::Sqrt) = e.action {
         (2, &e.children[0])
     } else if let Action::Fun(Function::Root) = e.action {
-        if let Action::Num { value: Number::Int(i) } = e.children[0].action {
+        if let Action::Num {
+            value: Number::Int(i),
+        } = e.children[0].action
+        {
             (i, &e.children[1])
         } else {
             panic!("Expected integer, got {:?}", e.children[0]);
         }
     } else if let Action::Pow = e.action {
-        let (base, pow) = if let Action::Num { value: Number::Rational(num, den) } = e.children[1].action {
+        let (base, pow) = if let Action::Num {
+            value: Number::Rational(num, den),
+        } = e.children[1].action
+        {
             (den, num)
         } else {
             panic!("Expected rational number, got {:?}", e.children[1]);
         };
 
-        let num = if let Action::Num { value: Number::Int(i) } = e.children[0].action {
+        let num = if let Action::Num {
+            value: Number::Int(i),
+        } = e.children[0].action
+        {
             if pow == 1 {
                 Expression::create_value(Number::Int(i))
             } else {
@@ -222,10 +236,7 @@ pub(crate) fn root_reduce(e: &Expression) -> Expression {
         return if base == 2 {
             Expression::create_function(Function::Sqrt, vec![num])
         } else {
-            Expression::create_function(
-                Function::Root,
-                vec![Expression::create_value(base), num],
-            )
+            Expression::create_function(Function::Root, vec![Expression::create_value(base), num])
         };
     } else {
         panic!("Expected root, got {:?}", e);
@@ -239,11 +250,9 @@ pub(crate) fn root_reduce(e: &Expression) -> Expression {
 
     match num {
         Number::Int(i) => Expression::create_value(i.nth_root(base as u32)),
-        Number::Rational(num, den) => {Expression::new_binary(
-            create_root(base, num),
-            create_root(base, den),
-            Action::Div,
-        )},
+        Number::Rational(num, den) => {
+            Expression::new_binary(create_root(base, num), create_root(base, den), Action::Div)
+        }
         Number::Real(f) => Expression::create_value(f.powf(1.0 / base as f64)),
     }
 }
@@ -254,7 +263,10 @@ fn create_root(base: i64, num: i64) -> Expression {
     } else {
         Expression::create_function(
             Function::Root,
-            vec![Expression::create_value(base), Expression::create_value(num)],
+            vec![
+                Expression::create_value(base),
+                Expression::create_value(num),
+            ],
         )
     }
 }
@@ -365,14 +377,16 @@ pub(crate) fn combine(e: &Expression) -> Expression {
 pub(crate) fn sort(e: &Expression) -> Expression {
     let mut res = e.children.clone();
     if e.action == Action::Mul {
-        res.sort_by(|a, b| if is_value(a) {
-            std::cmp::Ordering::Less
-        } else if is_value(b) {
-            std::cmp::Ordering::Greater
-        } else {
-            let a = a.count_variables();
-            let b = b.count_variables();
-            b.cmp(&a)
+        res.sort_by(|a, b| {
+            if is_value(a) {
+                std::cmp::Ordering::Less
+            } else if is_value(b) {
+                std::cmp::Ordering::Greater
+            } else {
+                let a = a.count_variables();
+                let b = b.count_variables();
+                b.cmp(&a)
+            }
         });
     } else if e.action == Action::Add {
         res.sort_by(|a, b| {
@@ -388,4 +402,22 @@ pub(crate) fn sort(e: &Expression) -> Expression {
         panic!("Cannot sort {}", e);
     }
     Expression::new(res, e.action.clone())
+}
+
+pub(crate) fn independent_integrate(e: &Expression) -> Expression {
+    assert!(is_integral(e));
+    assert_eq!(e.children.len(), 2);
+    let f = &e.children[0];
+    let var = &e.children[1];
+    let mut children = f.children.clone();
+    let f = if Action::Mul == f.action {
+        children.push(
+            var.clone()
+        );
+        Expression::new(children, Action::Mul)
+    } else {
+        Expression::new_binary(f.clone(), var.clone(), Action::Mul)
+    };
+
+    Expression::create_function(Function::Int, vec![f, var.clone()])
 }
