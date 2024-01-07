@@ -26,7 +26,7 @@ enum Rules {
     Logarithm,
     Sqrt,
     Trigonometry,
-    Abs,
+    Misc,
     Finalize,
 }
 
@@ -110,6 +110,7 @@ impl Rules {
             Self::Logarithm => RuleSet(vec![
                 rule!("domain log", Ln(~a:is_nonpositive) => Error("domain log")),
                 rule!("domain log", Log(~base, ~a:is_nonpositive) => Error("domain log")),
+                //rule!("reduce log", ~a:is_log_reducible => log_reduce(~a)),
                 rule!("log(1) = 0", Ln(1) => 0),
                 rule!("log(1) = 0", Log(~base, 1) => 0),
                 rule!("ln(e^x)=x", Ln(^(E, ~x)) => ~x),
@@ -181,8 +182,9 @@ impl Rules {
                 rule!("periodicity tan", Tan(+(*(~a:(is_integer,!is_zero), Pi), ~~b)) => Tan(~~b)),
                 rule!("sin^2 + cos^2 = 1", +(^(Sin(~a), 2), ^(Cos(~a), 2)) => 1),
             ]),
-            Self::Abs => RuleSet(vec![
-                rule!("evaluate the absolute value", Abs(~n:is_value) => abs(~n)),
+            Self::Misc => RuleSet(vec![
+                rule!("abs", Abs(~n:is_value) => abs(~n)),
+                rule!("max", Max(~a:is_value, ~b:is_value) => max(Max(~a, ~b))),
             ]),
             Self::FullExpand => Self::create_rulesets(&[
                 Self::Form,
@@ -195,7 +197,7 @@ impl Rules {
                 Self::Logarithm,
                 Self::Sqrt,
                 Self::Trigonometry,
-                Self::Abs,
+                Self::Misc,
             ]),
             Self::Finalize => RuleSet(vec![rule!("reorder terms", ~a:!is_sorted => sort(~a))]),
         } 

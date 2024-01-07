@@ -17,6 +17,7 @@ pub enum Map {
     Sort,
     IndependentIntegrate,
     Abs,
+    Max
 }
 
 impl Map {
@@ -31,6 +32,7 @@ impl Map {
             Self::Sort => sort(&expr),
             Self::IndependentIntegrate => independent_integrate(&expr),
             Self::Abs => abs(&expr),
+            Self::Max => max(&expr),
         }
     }
 }
@@ -49,6 +51,7 @@ impl FromStr for Map {
             "sort" => Ok(Self::Sort),
             "independent_integrate" => Ok(Self::IndependentIntegrate),
             "abs" => Ok(Self::Abs),
+            "max" => Ok(Self::Max),
             _ => Err(()),
         }
     }
@@ -440,5 +443,29 @@ pub(crate) fn abs(e: &Expression) -> Expression {
         }
     } else {
         panic!("Expected value, got {}", e);
+    }
+}
+
+pub(crate) fn max(e: &Expression) -> Expression {
+    assert_eq!(e.action, Action::Fun(Function::Max));
+    assert_eq!(e.children.len(), 2);
+    let a = if let Action::Num { value } = &e.children[0].action {
+        value.clone()
+    } else if let Action::Const(c) = &e.children[0].action {
+        Number::from(*c)
+    } else {
+        panic!("Expected number, got {}", e.children[0]);
+    };
+    let b = if let Action::Num { value } = &e.children[1].action {
+        value.clone()
+    } else if let Action::Const(c) = &e.children[1].action {
+        Number::from(*c)
+    } else {
+        panic!("Expected number, got {}", e.children[1]);
+    };
+    if a > b {
+        e.children[0].clone()
+    } else {
+        e.children[1].clone()
     }
 }

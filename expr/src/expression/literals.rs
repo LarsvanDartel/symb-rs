@@ -19,9 +19,10 @@ pub const LOG: &str = "Log";
 pub const DIFF: &str = "D";
 pub const INT: &str = "Int";
 pub const ABS: &str = "Abs";
+pub const MAX: &str = "Max";
 
 #[allow(dead_code)]
-pub const FUNCTIONS: [&str; 11] = [SIN, COS, TAN, SQRT, ROOT, EXP, LN, LOG, DIFF, INT, ABS];
+pub const FUNCTIONS: [&str; 12] = [SIN, COS, TAN, SQRT, ROOT, EXP, LN, LOG, DIFF, INT, ABS, MAX];
 
 pub const PI_SHORT: &str = "π";
 pub const PI: &str = "Pi";

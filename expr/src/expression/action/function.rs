@@ -36,6 +36,9 @@ pub enum Function {
 
     /// Absolute value
     Abs,
+
+    /// Max
+    Max,
 }
 
 impl Function {
@@ -43,6 +46,7 @@ impl Function {
         match self.clone() {
             Function::Root | Function::Log => 2,
             Function::D | Function::Int => 2,
+            Function::Max => 2,
             _ => 1,
         }
     }
@@ -64,6 +68,7 @@ impl FromStr for Function {
             literals::DIFF => Ok(Function::D),
             literals::INT => Ok(Function::Int),
             literals::ABS => Ok(Function::Abs),
+            literals::MAX => Ok(Function::Max),
             _ => Err(format!("Unknown function: {}", s)),
         }
     }
@@ -95,6 +100,7 @@ impl std::fmt::Display for Function {
             Function::D => f.write_str(literals::DIFF),
             Function::Int => f.write_str(literals::INT),
             Function::Abs => f.write_str(literals::ABS),
+            Function::Max => f.write_str(literals::MAX),
         }
     }
 }
