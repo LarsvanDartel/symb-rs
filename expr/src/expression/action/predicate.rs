@@ -36,6 +36,7 @@ pub enum PredicateType {
     IsVariable,
     IsRationalReducible,
     IsRootReducible,
+    IsLogReducible,
     CanCombine,
     IsDerivativeIndependent,
     IsIntegralIndependent,
@@ -61,6 +62,7 @@ impl PredicateType {
             Self::IsVariable => is_variable(expr),
             Self::IsRationalReducible => is_rational_reducible(expr),
             Self::IsRootReducible => is_root_reducible(expr),
+            Self::IsLogReducible => is_log_reducible(expr),
             Self::CanCombine => can_combine(expr),
             Self::IsDerivativeIndependent => is_derivative(expr) && is_independent(expr),
             Self::IsIntegralIndependent => is_integral(expr) && is_independent(expr),
@@ -90,6 +92,7 @@ impl FromStr for PredicateType {
             "is_variable" => Ok(Self::IsVariable),
             "is_rational_reducible" => Ok(Self::IsRationalReducible),
             "is_root_reducible" => Ok(Self::IsRootReducible),
+            "is_log_reducible" => Ok(Self::IsLogReducible),
             "can_combine" => Ok(Self::CanCombine),
             "is_derivative_independent" => Ok(Self::IsDerivativeIndependent),
             "is_integral_independent" => Ok(Self::IsIntegralIndependent),
@@ -229,6 +232,38 @@ fn is_perfect_root(num: i64, n: i64) -> bool {
     }
     let root = num.nth_root(n as u32);
     root.pow(n as u32) == num
+}
+
+pub(crate) fn is_log_reducible(expr: &Expression) -> bool {
+    if Action::Fun(Function::Log) != expr.action {
+        return false;
+    }
+
+    if !is_positive(&expr.children[0])
+        || !is_positive(&expr.children[1])
+        || is_one(&expr.children[0]) {
+        return false;
+    }
+
+    let base = if let Action::Num { value: Number::Int(i) } = &expr.children[0].action {
+        *i
+    } else {
+        return false;
+    };
+    let num = if let Action::Num { value } = &expr.children[1].action {
+        value.clone()
+    } else {
+        return false;
+    };
+
+    let mut i = Number::Int(1);
+    while i < num {
+        i = i * base;
+    }
+    while i > num {
+        i = i / base;
+    }
+    i == num
 }
 
 pub(crate) fn can_combine(expr: &Expression) -> bool {

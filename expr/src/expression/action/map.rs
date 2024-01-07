@@ -11,6 +11,7 @@ pub enum Map {
     Reduce,
     RationalReduce,
     RootReduce,
+    LogReduce,
     CreateRational,
     Distribute,
     Combine,
@@ -26,6 +27,7 @@ impl Map {
             Self::Reduce => reduce(&expr),
             Self::RationalReduce => rational_reduce(&expr),
             Self::RootReduce => root_reduce(&expr),
+            Self::LogReduce => log_reduce(&expr),
             Self::CreateRational => create_rational(&expr),
             Self::Distribute => distribute(&expr),
             Self::Combine => combine(&expr),
@@ -45,6 +47,7 @@ impl FromStr for Map {
             "reduce" => Ok(Self::Reduce),
             "rational_reduce" => Ok(Self::RationalReduce),
             "root_reduce" => Ok(Self::RootReduce),
+            "log_reduce" => Ok(Self::LogReduce),
             "create_rational" => Ok(Self::CreateRational),
             "distribute" => Ok(Self::Distribute),
             "combine" => Ok(Self::Combine),
@@ -274,6 +277,44 @@ fn create_root(base: i64, num: i64) -> Expression {
                 Expression::create_value(num),
             ],
         )
+    }
+}
+
+pub(crate) fn log_reduce(e: &Expression) -> Expression {
+    assert_eq!(e.action, Action::Fun(Function::Log));
+    assert_eq!(e.children.len(), 2);
+    let base = if let Action::Num {
+        value: Number::Int(i),
+    } = e.children[0].action
+    {
+        i
+    } else {
+        panic!("Expected integer, got {:?}", e.children[0]);
+    };
+    let num = if let Action::Num { value } = e.children[1].action {
+        value
+    } else {
+        panic!("Expected number, got {:?}", e.children[1]);
+    };
+    
+    if base == 1 {
+        panic!("Cannot take log of 1");
+    }
+
+    let mut i = Number::Int(1);
+    let mut log = 0;
+    while i < num {
+        i = i * base;
+        log += 1;
+    }
+    while i > num {
+        i = i / base;
+        log -= 1;
+    }
+    if i == num {
+        Expression::create_value(log)
+    } else {
+        panic!("Cannot take log of {}", num);
     }
 }
 

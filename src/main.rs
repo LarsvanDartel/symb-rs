@@ -110,7 +110,8 @@ impl Rules {
             Self::Logarithm => RuleSet(vec![
                 rule!("domain log", Ln(~a:is_nonpositive) => Error("domain log")),
                 rule!("domain log", Log(~base, ~a:is_nonpositive) => Error("domain log")),
-                //rule!("reduce log", ~a:is_log_reducible => log_reduce(~a)),
+                rule!("domain log", Log(~base:is_nonpositive, ~a) => Error("domain log")),
+                rule!("reduce log", ~a:is_log_reducible => log_reduce(~a)),
                 rule!("log(1) = 0", Ln(1) => 0),
                 rule!("log(1) = 0", Log(~base, 1) => 0),
                 rule!("ln(e^x)=x", Ln(^(E, ~x)) => ~x),

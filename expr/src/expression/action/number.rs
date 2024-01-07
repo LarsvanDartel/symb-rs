@@ -110,6 +110,30 @@ impl std::ops::Mul for Number {
     }
 }
 
+impl std::ops::Mul<i64> for Number {
+    type Output = Self;
+
+    fn mul(self, rhs: i64) -> Self::Output {
+        match self {
+            Number::Int(a) => Number::Int(a * rhs),
+            Number::Rational(a, b) => Number::Rational(a * rhs, b),
+            Number::Real(a) => Number::Real(a * rhs as f64),
+        }
+    }
+}
+
+impl std::ops::Div<i64> for Number {
+    type Output = Self;
+
+    fn div(self, rhs: i64) -> Self::Output {
+        match self {
+            Number::Int(a) => Number::Int(a / rhs),
+            Number::Rational(a, b) => Number::Rational(a, b * rhs),
+            Number::Real(a) => Number::Real(a / rhs as f64),
+        }
+    }
+}
+
 impl std::cmp::PartialOrd for Number {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match (self, other) {
