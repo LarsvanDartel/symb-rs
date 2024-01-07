@@ -288,25 +288,33 @@ pub(crate) fn log_reduce(e: &Expression) -> Expression {
     } else {
         panic!("Expected integer, got {:?}", e.children[0]);
     };
+
+    if base == 1 {
+        panic!("Cannot take log of 1");
+    }
+
     let num = if let Action::Num { value } = e.children[1].action {
         value
     } else {
         panic!("Expected number, got {:?}", e.children[1]);
     };
-    
-    if base == 1 {
-        panic!("Cannot take log of 1");
-    }
 
-    let mut i = Number::Int(1);
+    let (num, inv) = match num {
+        Number::Int(i) => (i, false),
+        Number::Rational(num, den) => {
+            assert!(num == 1);
+            (den, true)
+        },
+        Number::Real(f) => {
+            return Expression::create_value(f.log(base as f64).round());
+        }
+    };
+
+    let mut i = 1;
     let mut log = 0;
     while i < num {
         i = i * base;
-        log += 1;
-    }
-    while i > num {
-        i = i / base;
-        log -= 1;
+        log += (!inv as i64) * 2 - 1;
     }
     if i == num {
         Expression::create_value(log)

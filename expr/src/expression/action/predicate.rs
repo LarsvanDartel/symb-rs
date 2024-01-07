@@ -269,12 +269,20 @@ pub(crate) fn is_log_reducible(expr: &Expression) -> bool {
         return false;
     };
 
-    let mut i = Number::Int(1);
+    let num = match num {
+        Number::Int(i) => i,
+        Number::Rational(num, den) => {
+            if num != 1 {
+                return false;
+            }
+            den
+        }
+        _ => return true,
+    };
+
+    let mut i = 1;
     while i < num {
-        i = i * base;
-    }
-    while i > num {
-        i = i / base;
+        i *= base;
     }
     i == num
 }
