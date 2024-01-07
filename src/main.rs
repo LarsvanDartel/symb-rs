@@ -28,7 +28,15 @@ fn main() {
             let mut rhs = expr.get_rhs().unwrap().clone();
             apply_rules(&rules::CLEANUP_RULES, &mut rhs, false, false);
             println!("Received: {} = {}", lhs, rhs);
-            let records = SimpleRewriter::rewrite(&lhs, &rhs, &rules::FULL_EXPAND_RULES).unwrap();
+            let records = if let Some(records) = SimpleRewriter::rewrite(&lhs, &rhs, &rules::FULL_EXPAND_RULES) {
+                records
+            } else {
+                println!("Could not rewrite");
+                continue;
+            };
+            if records.is_empty() {
+                continue;
+            }
             println!("Rewrite records:");
             let lmax = records
                 .iter()

@@ -17,13 +17,25 @@ impl Rewriter for SimpleRewriter {
         if a != b {
             return None;
         }
+        
+        // remove records from the tail where a and b match
+        let mut i = 0;
+        while i < a_records.len() && i < b_records.len() {
+            if a_records[a_records.len() - i - 1].old != b_records[b_records.len() - i - 1].old {
+                break;
+            }
+            i += 1;
+        }
+        let na = a_records.len() - i;
+        let nb = b_records.len() - i;
 
         let mut records = Vec::new();
-        records.extend(a_records);
-        records.extend(b_records.into_iter().map(|record| RewriteRecord {
+
+        records.extend(a_records.into_iter().take(na));
+        records.extend(b_records.into_iter().take(nb).map(|record| RewriteRecord {
+            old: record.old,
+            new: record.new,
             message: record.message,
-            old: record.new,
-            new: record.old,
         }).rev());
 
         Some(records)
