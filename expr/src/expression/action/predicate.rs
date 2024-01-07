@@ -194,7 +194,11 @@ pub(crate) fn is_variable(expr: &Expression) -> bool {
 }
 
 pub(crate) fn is_rational_reducible(expr: &Expression) -> bool {
-    matches!(expr.action, Action::Num { value: Number::Rational(num, den) } if num.gcd(&den) != 1)
+    if let Action::Num { value: Number::Rational(num, den) } = expr.action {
+        den < 0 || den == 1 || num.gcd(&den) != 1
+    } else {
+        false
+    }
 }
 
 pub(crate) fn is_root_reducible(expr: &Expression) -> bool {

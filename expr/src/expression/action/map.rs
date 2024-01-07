@@ -183,16 +183,20 @@ fn reduce(e: &Expression) -> Expression {
 
 pub(crate) fn rational_reduce(e: &Expression) -> Expression {
     if let Action::Num {
-        value: Number::Rational(num, den),
+        value: Number::Rational(mut num, mut den),
     } = e.action
     {
+        if den < 0 {
+            num = -num;
+            den = -den;
+        }
         let gcd = num.gcd(&den);
         if gcd == den {
             Expression::create_value(Number::Int(num / den))
         } else if gcd != 1 {
             Expression::create_value(Number::Rational(num / gcd, den / gcd))
         } else {
-            panic!("{:?} is not reducible", e);
+            Expression::create_value(Number::Rational(num, den))
         }
     } else {
         panic!("Expected rational number, got {:?}", e);

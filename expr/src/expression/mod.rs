@@ -394,51 +394,41 @@ impl Expression {
             _ => {
                 let mut children = vec![];
                 for c in &self.children {
-                    if Action::Mul == self.action {
-                        if let Action::Slot { name, .. } = &c.action {
+                    let mut c = c.clone();
+                    if c.action == Action::Fun(Function::D) {
+                        if let Action::Slot { name: n0, .. } = &c.children[0].action {
+                            if let Action::Slot { name: n1, .. } = &c.children[1].action {
+                                if patterns.get(n0) == patterns.get(n1) {
+                                    c = Expression::create_value(1);
+                                }
+                            }
+                        }
+                    } else if c.action == Action::Div {
+                        if let Action::Slot { name, .. } = &c.children[1].action {
                             if matches!(
                                 patterns.get(name).map(|e| &e.action),
                                 Some(Action::Num {
                                     value: Number::Int(1)
                                 })
                             ) {
-                                continue;
-                            }
-                        } else if c.action == Action::Fun(Function::D) {
-                            if let Action::Slot { name: n0, .. } = &c.children[0].action {
-                                if let Action::Slot { name: n1, .. } = &c.children[1].action {
-                                    if patterns.get(n0) == patterns.get(n1) {
-                                        continue;
-                                    }
-                                }
-                            }
-                        } else if let Action::Div = c.action {
-                            if matches!(
-                                c.children[0].action,
-                                Action::Num {
-                                    value: Number::Int(1)
-                                }
-                            ) {
-                                if let Action::Slot { name, .. } = &c.children[1].action {
-                                    if matches!(
-                                        patterns.get(name).map(|e| &e.action),
-                                        Some(Action::Num {
-                                            value: Number::Int(1)
-                                        })
-                                    ) {
-                                        continue;
-                                    }
-                                }
+                                c = c.children[0].clone();
                             }
                         }
-                    } else if Action::Add == self.action {
-                        if let Action::Slot { name, .. } = &c.action {
-                            if let Some(Action::Num {
-                                value: Number::Int(0),
-                            }) = patterns.get(name).map(|e| &e.action)
-                            {
-                                continue;
+                    }
+                    if matches!(self.action, Action::Add | Action::Mul) {
+                        let expr = if let Action::Slot { name, .. } | Action::Segment { name, .. } =
+                            &c.action
+                        {
+                            if let Some(expr) = patterns.get(name) {
+                                expr
+                            } else {
+                                &c
                             }
+                        } else {
+                            &c
+                        };
+                        if expr == &self.action.identity() {
+                            continue;
                         }
                     }
                     if let Action::Err(_) = c.action {
