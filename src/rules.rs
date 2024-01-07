@@ -104,6 +104,12 @@ impl Rules {
             ]),
             Self::Integration => RuleSet(vec![
                 rule!("independence", ~a:is_integral_independent => independent_integrate(~a)),
+                rule!("homogeneity", Int(*(~~a:is_value:1, ~~b:!is_value:1), ~x) => *(~~a, Int(~~b, ~x))),
+                // rule!("additivity", Int(+(~~a), ~x) => reduce(Int(~~a, ~x))),
+                rule!("primitive of cos", Int(Cos(+(*(~a:is_value, ~x:is_variable), ~~b:is_value)), ~x) => *(/(1, ~a), Sin(+(*(~a, ~x), ~~b)))),
+                rule!("primitive of sin", Int(Sin(+(*(~a:is_value, ~x:is_variable), ~~b:is_value)), ~x) => *(/(-1, ~a), Cos(+(*(~a, ~x), ~~b)))),
+                rule!("primitive of exp", Int(Exp(+(*(~a:is_value, ~x:is_variable), ~~b:is_value)), ~x) => *(/(1, ~a), Exp(+(*(~a, ~x), ~~b)))),
+                rule!("primitive of 1/(ax+b)", Int(/(1, +(*(~a:is_value, ~x:is_variable), ~~b:is_value)), ~x) => *(/(1, ~a), Ln(Abs(+(*(~a, ~x), ~~b))))),
             ]),
             Self::Logarithm => RuleSet(vec![
                 rule!("domain log", Ln(~a:is_nonpositive) => Error("domain log")),
