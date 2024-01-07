@@ -396,6 +396,6 @@ pub fn rule(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     };
 
     proc_macro::TokenStream::from(quote! {
-        Box::new(::expr::MatchRule::new(#name, #pattern, #replacement, #predicate, #show))
+        ::expr::Rule::new(#name, #pattern, #replacement, #predicate, #show)
     })
 }

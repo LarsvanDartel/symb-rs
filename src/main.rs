@@ -1,17 +1,17 @@
 extern crate expr;
 
-mod rules;
 mod rewrite;
+mod rules;
 
 use expr::Expression;
-use rules::Rules;
 use std::io::Write;
 
-fn main() {
-    let cleanup_ruleset = Rules::Cleanup.create_ruleset();
-    let expand_ruleset = Rules::FullExpand.create_ruleset();
-    let finalize_ruleset = Rules::Finalize.create_ruleset();
+use crate::{
+    rewrite::{Rewriter, SimpleRewriter},
+    rules::apply_rules,
+};
 
+fn main() {
     loop {
         print!("calc > ");
         std::io::stdout().flush().unwrap();
@@ -20,13 +20,44 @@ fn main() {
         if input.trim() == "exit" {
             break;
         }
-        let expr = Expression::from(input);
-        let expr = cleanup_ruleset.apply(expr, false);
-        println!("Received: {}", expr);
-        //println!("Received: {:?}", expr);
+        let mut expr = Expression::from(input);
 
-        let expr = expand_ruleset.apply_finalize(expr, &finalize_ruleset, true);
-        println!("Result: {}", expr);
-        //println!("Result: {:?}", expr);
+        if expr.is_equality() {
+            let mut lhs = expr.get_lhs().unwrap().clone();
+            apply_rules(&rules::CLEANUP_RULES, &mut lhs, false, false);
+            let mut rhs = expr.get_rhs().unwrap().clone();
+            apply_rules(&rules::CLEANUP_RULES, &mut rhs, false, false);
+            println!("Received: {} = {}", lhs, rhs);
+            let records = SimpleRewriter::rewrite(&lhs, &rhs, &rules::FULL_EXPAND_RULES).unwrap();
+            println!("Rewrite records:");
+            let lmax = records
+                .iter()
+                .map(|record| record.old.to_string().len())
+                .max()
+                .unwrap();
+            let rmax = records
+                .iter()
+                .map(|record| record.new.to_string().len())
+                .max()
+                .unwrap();
+            for record in records {
+                println!(
+                    "=> {}{} = {}{}    ({})",
+                    " ".repeat(lmax - record.old.to_string().len()),
+                    record.old,
+                    record.new,
+                    " ".repeat(rmax - record.new.to_string().len()),
+                    record.message
+                );
+            }
+        } else {
+            apply_rules(&rules::CLEANUP_RULES, &mut expr, false, false);
+            println!("Received: {}", expr);
+            //println!("Received: {:?}", expr);
+
+            apply_rules(&rules::FULL_EXPAND_RULES, &mut expr, true, true);
+            println!("Result: {}", expr);
+            //println!("Result: {:?}", expr);
+        }
     }
 }

@@ -2,23 +2,8 @@ use std::collections::HashMap;
 
 use crate::Expression;
 
-pub trait Rule {
-    fn apply(&self, expr: &Expression) -> Option<Expression>;
-    fn counts(&self) -> bool {
-        true
-    }
-    fn name(&self) -> &str {
-        "Unnamed rule"
-    }
-}
-
-impl std::fmt::Debug for dyn Rule {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name())
-    }
-}
-
-pub struct MatchRule {
+#[derive(Clone)]
+pub struct Rule {
     name: String,
     pattern: Expression,
     replacement: Expression,
@@ -26,7 +11,7 @@ pub struct MatchRule {
     show: bool,
 }
 
-impl MatchRule {
+impl Rule {
     pub fn new<T: ToString>(
         name: T,
         pattern: Expression,
@@ -42,10 +27,8 @@ impl MatchRule {
             show,
         }
     }
-}
 
-impl Rule for MatchRule {
-    fn apply(&self, expr: &Expression) -> Option<Expression> {
+    pub fn apply(&self, expr: &Expression) -> Option<Expression> {
         let mut patterns = HashMap::new();
         if expr.is_error() {
             return None;
@@ -70,16 +53,16 @@ impl Rule for MatchRule {
         }
     }
 
-    fn counts(&self) -> bool {
+    pub fn counts(&self) -> bool {
         self.show
     }
 
-    fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         &self.name
     }
 }
 
-impl std::fmt::Debug for MatchRule {
+impl std::fmt::Debug for Rule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {} => {}", self.name, self.pattern, self.replacement)
     }

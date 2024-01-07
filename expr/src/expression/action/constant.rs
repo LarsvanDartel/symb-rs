@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::{literals, Number};
+use super::{literals, Number};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Constant {
@@ -46,7 +46,7 @@ impl From<Constant> for Number {
 
 impl std::fmt::Display for Constant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.clone() {
+        match self {
             Constant::Pi => f.write_str(literals::PI_SHORT),
             Constant::E => f.write_str(literals::EULER),
         }

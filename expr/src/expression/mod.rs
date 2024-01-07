@@ -160,6 +160,26 @@ impl Expression {
     pub fn is_error(&self) -> bool {
         matches!(self.action, Action::Err(_))
     }
+
+    pub fn is_equality(&self) -> bool {
+        matches!(self.action, Action::Equals)
+    }
+
+    pub fn get_lhs(&self) -> Option<&Expression> {
+        if let Action::Equals = self.action {
+            Some(&self.children[0])
+        } else {
+            None
+        }
+    }
+
+    pub fn get_rhs(&self) -> Option<&Expression> {
+        if let Action::Equals = self.action {
+            Some(&self.children[1])
+        } else {
+            None
+        }
+    }
 }
 
 /// Matching expressions
@@ -461,7 +481,7 @@ impl Expression {
 
 /// Applying rules to expressions
 impl Expression {
-    pub fn apply_rule(&self, rule: &dyn Rule) -> Option<Expression> {
+    pub fn apply_rule(&self, rule: &Rule) -> Option<Expression> {
         if let Some(e) = rule.apply(self) {
             Some(e)
         } else {

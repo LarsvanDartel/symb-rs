@@ -9,12 +9,7 @@ use nom::{
 
 use std::str::FromStr;
 
-use crate::Function;
-
-use super::literals;
-use super::Action;
-use super::Expression;
-use super::Number;
+use super::{literals, Action, Expression, Number, Function};
 
 type ParseResult<'a, T> = IResult<&'a str, T>;
 

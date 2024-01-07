@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::{Action, Expression, Function, Number};
+use super::{Action, Expression, Function, Number};
 use num_integer::{Integer, Roots};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -50,7 +50,7 @@ impl PredicateType {
         }
     }
 
-    pub(crate) fn eval(&self, args: &Vec<Expression>) -> bool {
+    pub(crate) fn eval(&self, args: &[Expression]) -> bool {
         if self.arity() != args.len() {
             panic!(
                 "Expected {} arguments, got {}",
@@ -268,7 +268,7 @@ pub(crate) fn is_log_reducible(expr: &Expression) -> bool {
         return false;
     };
     let num = if let Action::Num { value } = &expr.children[1].action {
-        value.clone()
+        *value
     } else {
         return false;
     };

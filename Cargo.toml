@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 expr = { path = "expr"}
 expr_macro = { path = "expr_macro"}
+once_cell = "1.19.0"

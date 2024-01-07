@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use super::predicate::{
     is_integer, is_number, is_one, is_root_reducible, is_value, is_zero, is_nonnegative,
 };
-use crate::{Action, Expression, Function, Number};
+use super::{Action, Expression, Function, Number};
 use num_integer::{Integer, Roots};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -317,7 +317,7 @@ pub(crate) fn log_reduce(e: &Expression) -> Expression {
     let mut i = 1;
     let mut log = 0;
     while i < num {
-        i = i * base;
+        i *= base;
         log += (!inv as i64) * 2 - 1;
     }
     if i == num {
@@ -482,14 +482,14 @@ pub(crate) fn max(e: &Expression) -> Expression {
     assert_eq!(e.action, Action::Fun(Function::Max));
     assert_eq!(e.children.len(), 2);
     let a = if let Action::Num { value } = &e.children[0].action {
-        value.clone()
+        *value
     } else if let Action::Const(c) = &e.children[0].action {
         Number::from(*c)
     } else {
         panic!("Expected number, got {}", e.children[0]);
     };
     let b = if let Action::Num { value } = &e.children[1].action {
-        value.clone()
+        *value
     } else if let Action::Const(c) = &e.children[1].action {
         Number::from(*c)
     } else {
