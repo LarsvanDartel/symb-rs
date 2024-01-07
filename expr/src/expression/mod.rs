@@ -2,10 +2,10 @@ mod action;
 pub mod literals;
 mod parser;
 
-use crate::{Rule, RuleSet};
+use crate::Rule;
 pub use action::{Action, Constant, Function, Map, Number, Predicate, PredicateType};
-use parser::Parser;
 use literals::{to_subscript, to_superscript};
+use parser::Parser;
 use std::{
     collections::HashMap,
     hash::{DefaultHasher, Hash, Hasher},
@@ -310,7 +310,7 @@ impl Expression {
         true
     }
 
-    pub fn matches(&self, other: &Self, patterns: &mut HashMap<String, Expression>) -> bool {
+    pub(crate) fn matches(&self, other: &Self, patterns: &mut HashMap<String, Expression>) -> bool {
         match (&self.action, &other.action) {
             (
                 Action::Segment { .. } | Action::Slot { .. },
@@ -368,6 +368,22 @@ impl Expression {
         }
     }
 
+    pub(crate) fn matches_final(
+        &self,
+        patterns: &HashMap<String, Expression>,
+    ) -> bool {
+        let expr = self.substitute_pattern(patterns);
+        expr.eval_predicates()
+    }
+
+    fn eval_predicates(&self) -> bool {
+        match &self.action {
+            Action::And => self.children.iter().all(|c| c.eval_predicates()),
+            Action::Predicate((predicate, positive)) => predicate.eval(&self.children) == *positive,
+            _ => false,
+        }
+    }
+
     pub(crate) fn substitute_pattern(&self, patterns: &HashMap<String, Expression>) -> Self {
         match &self.action {
             Action::Segment { name, .. } | Action::Slot { name, .. } => {
@@ -384,7 +400,7 @@ impl Expression {
                     if let Action::Mul = self.action {
                         if let Action::Fun(Function::D) = c.action {
                             if let Action::Slot { name: n0, .. } = &c.children[0].action {
-                                if let Action::Slot{ name: n1, .. } = &c.children[1].action {
+                                if let Action::Slot { name: n1, .. } = &c.children[1].action {
                                     if patterns.get(n0) == patterns.get(n1) {
                                         continue;
                                     }
@@ -411,7 +427,7 @@ impl Expression {
                         return self.action.identity();
                     }
                     if children.len() == 1 {
-                        return children.pop().unwrap()
+                        return children.pop().unwrap();
                     }
                 }
                 Expression::new(children, self.action.clone())
@@ -422,33 +438,7 @@ impl Expression {
 
 /// Applying rules to expressions
 impl Expression {
-    pub fn apply_ruleset<R: RuleSet>(&self, ruleset: &R, print: bool) -> Expression {
-        let mut expr = self.clone();
-        let mut cnt = 0;
-        loop {
-            let mut applied = false;
-            for rule in ruleset.rules() {
-                if let Some(new_expr) = expr.apply_rule(rule) {
-                    if print && rule.counts() {
-                        cnt += 1;
-                        println!("{}: {} = {}", rule.name(), expr, new_expr);
-                    }
-                    expr = new_expr;
-                    applied = true;
-                    break;
-                }
-            }
-            if !applied {
-                break;
-            }
-        }
-        if print && cnt != 0 {
-            println!("{} rule{} applied", cnt, if cnt == 1 { "" } else { "s" });
-        }
-        expr
-    }
-
-    pub(crate) fn apply_rule(&self, rule: &dyn Rule) -> Option<Expression> {
+    pub fn apply_rule(&self, rule: &dyn Rule) -> Option<Expression> {
         if let Some(e) = rule.apply(self) {
             Some(e)
         } else {
@@ -612,13 +602,19 @@ impl std::fmt::Display for Expression {
         if let Action::Fun(fun) = &self.action {
             let mut ignore = false;
             if let Function::Root = fun {
-                if let Action::Num { value: Number::Int(i) } = &self.children[0].action {
+                if let Action::Num {
+                    value: Number::Int(i),
+                } = &self.children[0].action
+                {
                     f.write_str(&to_superscript(i.to_string()))?;
                     f.write_str(&self.action.to_string())?;
                     ignore = true;
                 }
             } else if let Function::Log = fun {
-                if let Action::Num { value: Number::Int(i) } = &self.children[0].action {
+                if let Action::Num {
+                    value: Number::Int(i),
+                } = &self.children[0].action
+                {
                     f.write_str(&self.action.to_string())?;
                     f.write_str(&to_subscript(i.to_string()))?;
                     ignore = true;

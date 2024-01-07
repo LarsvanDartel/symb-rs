@@ -13,7 +13,7 @@ impl Predicate {
         Self { predicates }
     }
 
-    pub fn matches(&self, expr: &Expression) -> bool {
+    pub(crate) fn matches(&self, expr: &Expression) -> bool {
         self.predicates.iter().all(|(p, b)| p.matches(expr) == *b)
     }
 }
@@ -38,13 +38,36 @@ pub enum PredicateType {
     IsRootReducible,
     IsLogReducible,
     CanCombine,
-    IsDerivativeIndependent,
-    IsIntegralIndependent,
+    IsIndependent,
     IsSorted,
 }
 
 impl PredicateType {
-    fn matches(&self, expr: &Expression) -> bool {
+    pub(crate) fn arity(&self) -> usize {
+        match self {
+            Self::IsIndependent => 2,
+            _ => 1,
+        }
+    }
+
+    pub(crate) fn eval(&self, args: &Vec<Expression>) -> bool {
+        if self.arity() != args.len() {
+            panic!(
+                "Expected {} arguments, got {}",
+                self.arity(),
+                args.len()
+            );
+        }
+        if self.arity() == 1 {
+            return self.matches(&args[0]);
+        }
+        match self {
+            Self::IsIndependent => is_independent(&args[0], &args[1]),
+            _ => unimplemented!()
+        }
+    }
+
+    pub(crate) fn matches(&self, expr: &Expression) -> bool {
         match self {
             Self::IsNumber => is_number(expr),
             Self::IsInteger => is_integer(expr),
@@ -64,8 +87,7 @@ impl PredicateType {
             Self::IsRootReducible => is_root_reducible(expr),
             Self::IsLogReducible => is_log_reducible(expr),
             Self::CanCombine => can_combine(expr),
-            Self::IsDerivativeIndependent => is_derivative(expr) && is_independent(expr),
-            Self::IsIntegralIndependent => is_integral(expr) && is_independent(expr),
+            Self::IsIndependent => todo!(),
             Self::IsSorted => is_sorted(expr),
         }
     }
@@ -94,8 +116,7 @@ impl FromStr for PredicateType {
             "is_root_reducible" => Ok(Self::IsRootReducible),
             "is_log_reducible" => Ok(Self::IsLogReducible),
             "can_combine" => Ok(Self::CanCombine),
-            "is_derivative_independent" => Ok(Self::IsDerivativeIndependent),
-            "is_integral_independent" => Ok(Self::IsIntegralIndependent),
+            "is_independent" => Ok(Self::IsIndependent),
             "is_sorted" => Ok(Self::IsSorted),
             _ => Err(()),
         }
@@ -170,14 +191,6 @@ pub(crate) fn is_value(expr: &Expression) -> bool {
 
 pub(crate) fn is_variable(expr: &Expression) -> bool {
     matches!(expr.action, Action::Var { .. })
-}
-
-pub(crate) fn is_derivative(expr: &Expression) -> bool {
-    expr.action == Action::Fun(Function::D)
-}
-
-pub(crate) fn is_integral(expr: &Expression) -> bool {
-    expr.action == Action::Fun(Function::Int)
 }
 
 pub(crate) fn is_rational_reducible(expr: &Expression) -> bool {
@@ -285,18 +298,13 @@ pub(crate) fn can_combine(expr: &Expression) -> bool {
     }
 }
 
-pub(crate) fn is_independent(expr: &Expression) -> bool {
-    if is_derivative(expr) || is_integral(expr) {
-        assert_eq!(expr.children.len(), 2);
-        let var = if let Action::Var { name } = &expr.children[1].action {
-            name
-        } else {
-            panic!("Expected variable, got {:?}", expr.children[1]);
-        };
-        !expr.children[0].has_variable(var)
+pub(crate) fn is_independent(expr: &Expression, var: &Expression) -> bool {
+    let var = if let Action::Var { name } = &var.action {
+        name
     } else {
-        false
-    }
+        return false;
+    };
+    !expr.has_variable(var)
 }
 
 pub(crate) fn is_sorted(expr: &Expression) -> bool {

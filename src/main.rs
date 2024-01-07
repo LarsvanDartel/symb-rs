@@ -11,6 +11,7 @@ fn main() {
     let cleanup_ruleset = Rules::Cleanup.create_ruleset();
     let expand_ruleset = Rules::FullExpand.create_ruleset();
     let finalize_ruleset = Rules::Finalize.create_ruleset();
+
     loop {
         print!("calc > ");
         std::io::stdout().flush().unwrap();
@@ -20,12 +21,11 @@ fn main() {
             break;
         }
         let expr = Expression::from(input);
-        let expr = expr.apply_ruleset(&cleanup_ruleset, false);
+        let expr = cleanup_ruleset.apply(expr, false);
         println!("Received: {}", expr);
         //println!("Received: {:?}", expr);
 
-        let expr = expr.apply_ruleset(&expand_ruleset, true);
-        let expr = expr.apply_ruleset(&finalize_ruleset, true);
+        let expr = expand_ruleset.apply_finalize(expr, &finalize_ruleset, true);
         println!("Result: {}", expr);
         //println!("Result: {:?}", expr);
     }

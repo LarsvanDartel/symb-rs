@@ -1,13 +1,61 @@
 extern crate expr;
 extern crate expr_macro;
 
-use expr::Rule;
+use expr::{Rule, Expression};
 use expr_macro::rule;
 
 pub struct RuleSet(Vec<Box<dyn Rule>>);
-impl expr::RuleSet for RuleSet {
-    fn rules(&self) -> impl Iterator<Item = &dyn Rule> {
-        self.0.iter().map(|r| r.as_ref())
+
+impl RuleSet {
+    pub fn apply(&self, mut expr: Expression, print: bool) -> Expression {
+        let mut cnt = 0;
+        loop {
+            let mut applied = false;
+            for rule in &self.0 {
+                if let Some(new_expr) = expr.apply_rule(rule.as_ref()) {
+                    if print && rule.counts() {
+                        cnt += 1;
+                        println!("{}: {} = {}", rule.name(), expr, new_expr);
+                    }
+                    expr = new_expr;
+                    applied = true;
+                    break;
+                }
+            }
+            if !applied {
+                break;
+            }
+        }
+        if print && cnt != 0 {
+            println!("{} rule{} applied", cnt, if cnt == 1 { "" } else { "s" });
+        }
+        expr
+    }
+    
+    pub fn apply_finalize(&self, mut expr: Expression, finalize: &Self, print: bool) -> Expression {
+        let mut cnt = 0;
+        loop {
+            let mut applied = false;
+            for rule in &self.0 {
+                if let Some(new_expr) = expr.apply_rule(rule.as_ref()) {
+                    let new_expr = finalize.apply(new_expr, false);
+                    if print && rule.counts() {
+                        cnt += 1;
+                        println!("{}: {} = {}", rule.name(), expr, new_expr);
+                    }
+                    expr = new_expr;
+                    applied = true;
+                    break;
+                }
+            }
+            if !applied {
+                break;
+            }
+        }
+        if print && cnt != 0 {
+            println!("{} rule{} applied", cnt, if cnt == 1 { "" } else { "s" });
+        }
+        expr
     }
 }
 
@@ -37,12 +85,13 @@ impl Rules {
                 .collect(),
         )
     }
+
     pub fn create_ruleset(&self) -> RuleSet {
         match self {
             Self::Cleanup => RuleSet(vec![
                 rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b), false),
                 rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b), false),
-                rule!("create rational", /(~a:is_integer, ~b:(is_integer,!is_zero)) => create_rational(/(~a, ~b)), false),
+                rule!("create rational", /(~a:is_integer, ~b:(is_integer && !is_zero)) => create_rational(/(~a, ~b)), false),
             ]),
             Self::Form => RuleSet(vec![
                 rule!("identity minus", -(~a, ~b) => +(~a, *(-1, ~b))),
@@ -68,11 +117,11 @@ impl Rules {
                 rule!("rational simplification", ~a:is_rational_reducible => rational_reduce(~a)),
                 rule!("division by zero", /(~a, 0) => Error("undefined")),
                 rule!("identity divide", /(~a, 1) => ~a),
-                rule!("create rational", /(~a:is_integer, ~b:(is_integer,!is_zero)) => create_rational(/(~a, ~b))),
+                rule!("create rational", /(~a:is_integer, ~b:(is_integer && !is_zero)) => create_rational(/(~a, ~b))),
             ]),
             Self::Powers => RuleSet(vec![
-                rule!("numeric power", ^(~a:(is_number,!is_zero,!is_one), ~b:(is_integer,!is_zero,!is_one)) => reduce(^(~a, ~b))),
-                rule!("power expansion", ^(+(~~a), ~b:(is_integer,is_positive,!is_one)) => reduce(^(~~a, ~b))),
+                rule!("numeric power", ^(~a:(is_number && !is_zero && !is_one), ~b:(is_integer && !is_zero && !is_one)) => reduce(^(~a, ~b))),
+                rule!("power expansion", ^(+(~~a), ~b:(is_integer && is_positive && !is_one)) => reduce(^(~~a, ~b))),
                 rule!("identity power", ^(~a, 1) => ~a),
                 rule!("absorber power", ^(~a:!is_zero, 0) => 1),
                 rule!("absorber power", ^(1, ~a) => 1),
@@ -80,17 +129,17 @@ impl Rules {
                 rule!("division by zero", ^(0, ~a:is_negative) => Error("undefined")),
                 rule!("undeterminate form 0^0", ^(0, 0) => Error("undefined")),
                 rule!("associativity power", ^(^(~a, ~b:!is_one), ~c:!is_one) => ^(~a, *(~b, ~c))),
-                rule!("distributivity power", ^(*(~~a), ~b:(is_integer,!is_one,!is_zero)) => distribute(^(~~a, ~b))),
+                rule!("distributivity power", ^(*(~~a), ~b:(is_integer && !is_one && !is_zero)) => distribute(^(~~a, ~b))),
                 rule!("combine powers", ^(^(~a, ~b:(!is_one)), ~c) => ^(~a, *(~b, ~c))),
             ]),
             Self::Derivative => RuleSet(vec![
-                rule!("independence", ~a:is_derivative_independent => 0),
+                rule!("independence", D(~y, ~x:is_variable) => 0 if is_independent(~y, ~x)),
                 rule!("linearity", D(*(~~a:is_value:1, ~~b:!is_value:1), ~x) => *(~~a, D(~~b, ~x))),
                 rule!("identity", D(~x, ~x) => 1),
                 rule!("additivity", D(+(~~a), ~x) => reduce(D(~~a, ~x))),
                 rule!("multiplicativity", D(*(~~a::2), ~x) => reduce(D(~~a, ~x))),
-                rule!("natural power", D(^(~x, ~n:(is_integer,!is_zero,!is_one)), ~x) => *(~n, ^(~x, +(~n, -1)))),
-                rule!("natural power", D(^(~y:!is_variable, ~n:(is_integer,!is_zero,!is_one)), ~x) => *(~n, D(~y, ~x), ^(~y, +(~n, -1)))),
+                rule!("natural power", D(^(~x, ~n:(is_integer && !is_zero && !is_one)), ~x) => *(~n, ^(~x, +(~n, -1)))),
+                rule!("natural power", D(^(~y:!is_variable, ~n:(is_integer && !is_zero && !is_one)), ~x) => *(~n, D(~y, ~x), ^(~y, +(~n, -1)))),
                 rule!("derivative of e^x", D(Exp(~y), ~x) => *(D(~y, ~x), Exp(~y))),
                 rule!("derivative of a^x", D(^(~a:is_value, ~y), ~x) => *(D(~y, ~x), ^(~a, ~y), Ln(~a))),
                 rule!("rewrite x^x", D(^(~a:!is_value, ~y:!is_value), ~x) => D(Exp(*(~y, Ln(~a))), ~x)),
@@ -103,7 +152,7 @@ impl Rules {
                 rule!("derivative of tan", D(Tan(~y), ~x) => *(D(~y, ~x), ^(Cos(~y), -2))),
             ]),
             Self::Integration => RuleSet(vec![
-                rule!("independence", ~a:is_integral_independent => independent_integrate(~a)),
+                rule!("independence", Int(~y, ~x:is_variable) => *(~y, ~x) if is_independent(~y, ~x)),
             ]),
             Self::Logarithm => RuleSet(vec![
                 rule!("domain log", Ln(~a:is_nonpositive) => Error("domain log")),
@@ -117,8 +166,8 @@ impl Rules {
                 rule!("ln(e^x)=x", Ln(*(E, ~~x)) => +(1, Ln(~~x))),
                 rule!("log(a) + log(b) = log(ab)", +(Ln(~a), Ln(~b), ~~c) => +(Ln(*(~a, ~b)), ~~c)),
                 rule!("log(a) + log(b) = log(ab)", +(Log(~base, ~a), Log(~base, ~b), ~~c) => +(Log(~base, *(~a, ~b)), ~~c)),
-                rule!("n * log(a) = log(a^n)", *(~n:(is_integer,!is_one), Ln(~a), ~~b) => *(Ln(^(~a, ~n)), ~~b)),
-                rule!("n * log(a) = log(a^n)", *(~n:(is_integer,!is_one), Log(~base, ~a), ~~b) => *(Log(~base, ^(~a, ~n)), ~~b)),
+                rule!("n * log(a) = log(a^n)", *(~n:(is_integer && !is_one), Ln(~a), ~~b) => *(Ln(^(~a, ~n)), ~~b)),
+                rule!("n * log(a) = log(a^n)", *(~n:(is_integer && !is_one), Log(~base, ~a), ~~b) => *(Log(~base, ^(~a, ~n)), ~~b)),
             ]),
             Self::Sqrt => RuleSet(vec![
                 rule!("domain sqrt", Sqrt(~a:is_negative) => Error("domain sqrt")),
@@ -149,8 +198,8 @@ impl Rules {
                 rule!("unit circle sin", Sin(*(5/3, Pi)) => *(-1/2, Sqrt(3))),
                 rule!("unit circle sin", Sin(*(7/4, Pi)) => *(-1/2, Sqrt(2))),
                 rule!("unit circle sin", Sin(*(11/6, Pi)) => -1/2),
-                rule!("periodicity sin", Sin(+(*(~a:(is_even,!is_zero), Pi), ~~b)) => Sin(~~b)),
-                rule!("periodicity sin", Sin(+(*(~a:(is_odd,!is_one), Pi), ~~b)) => Sin(+(Pi, ~~b))),
+                rule!("periodicity sin", Sin(+(*(~a:(is_even && !is_zero), Pi), ~~b)) => Sin(~~b)),
+                rule!("periodicity sin", Sin(+(*(~a:(is_odd && !is_one), Pi), ~~b)) => Sin(+(Pi, ~~b))),
                 rule!("unit circle cos", Cos(0) => 1),
                 rule!("unit circle cos", Cos(*(1/6, Pi)) => *(1/2, Sqrt(3))),
                 rule!("unit circle cos", Cos(*(1/4, Pi)) => *(1/2, Sqrt(2))),
@@ -167,8 +216,8 @@ impl Rules {
                 rule!("unit circle cos", Cos(*(5/3, Pi)) => 1/2),
                 rule!("unit circle cos", Cos(*(7/4, Pi)) => *(1/2, Sqrt(2))),
                 rule!("unit circle cos", Cos(*(11/6, Pi)) => *(1/2, Sqrt(3))),
-                rule!("periodicity cos", Cos(+(*(~a:(is_even,!is_zero), Pi), ~~b)) => Cos(~~b)),
-                rule!("periodicity cos", Cos(+(*(~a:(is_odd,!is_one), Pi), ~~b)) => Cos(+(Pi, ~~b))),
+                rule!("periodicity cos", Cos(+(*(~a:(is_even && !is_zero), Pi), ~~b)) => Cos(~~b)),
+                rule!("periodicity cos", Cos(+(*(~a:(is_odd && !is_one), Pi), ~~b)) => Cos(+(Pi, ~~b))),
                 rule!("unit circle tan", Tan(0) => 0),
                 rule!("unit circle tan", Tan(*(1/6, Pi)) => *(1/3, Sqrt(3))),
                 rule!("unit circle tan", Tan(*(1/4, Pi)) => 1),
@@ -178,7 +227,7 @@ impl Rules {
                 rule!("unit circle tan", Tan(*(3/4, Pi)) => -1),
                 rule!("unit circle tan", Tan(*(5/6, Pi)) => *(-1/3, Sqrt(3))),
                 rule!("periodicity tan", Tan(Pi) => Tan(0)),
-                rule!("periodicity tan", Tan(+(*(~a:(is_integer,!is_zero), Pi), ~~b)) => Tan(~~b)),
+                rule!("periodicity tan", Tan(+(*(~a:(is_integer && !is_zero), Pi), ~~b)) => Tan(~~b)),
                 rule!("sin^2 + cos^2 = 1", +(^(Sin(~a), 2), ^(Cos(~a), 2)) => 1),
             ]),
             Self::Misc => RuleSet(vec![
@@ -198,7 +247,13 @@ impl Rules {
                 Self::Trigonometry,
                 Self::Misc,
             ]),
-            Self::Finalize => RuleSet(vec![rule!("reorder terms", ~a:!is_sorted => sort(~a))]),
+            Self::Finalize => RuleSet(vec![
+                rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b), false),
+                rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b), false),
+                rule!("collapse addition", +(~a) => ~a, false),
+                rule!("collapse multiplication", *(~a) => ~a, false),
+                rule!("reorder terms", ~a:!is_sorted => sort(~a), false)
+            ]),
         }
     }
 }

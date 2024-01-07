@@ -18,14 +18,11 @@ impl std::fmt::Debug for dyn Rule {
     }
 }
 
-pub trait RuleSet {
-    fn rules(&self) -> impl Iterator<Item = &dyn Rule>;
-}
-
 pub struct MatchRule {
     name: String,
     pattern: Expression,
     replacement: Expression,
+    predicate: Option<Expression>,
     show: bool,
 }
 
@@ -34,12 +31,14 @@ impl MatchRule {
         name: T,
         pattern: Expression,
         replacement: Expression,
+        predicate: Option<Expression>,
         show: bool,
     ) -> Self {
         Self {
             name: name.to_string(),
             pattern,
             replacement,
+            predicate,
             show,
         }
     }
@@ -52,6 +51,11 @@ impl Rule for MatchRule {
             return None;
         }
         if self.pattern.matches(expr, &mut patterns) {
+            if let Some(predicate) = &self.predicate {
+                if !predicate.matches_final(&patterns) {
+                    return None;
+                }
+            }
             Some(self.replacement.substitute_pattern(&patterns))
         } else {
             //if !patterns.is_empty() {

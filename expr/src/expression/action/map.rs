@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str::FromStr};
 
 use super::predicate::{
-    is_integer, is_integral, is_number, is_one, is_root_reducible, is_value, is_zero, is_nonnegative,
+    is_integer, is_number, is_one, is_root_reducible, is_value, is_zero, is_nonnegative,
 };
 use crate::{Action, Expression, Function, Number};
 use num_integer::{Integer, Roots};
@@ -16,7 +16,6 @@ pub enum Map {
     Distribute,
     Combine,
     Sort,
-    IndependentIntegrate,
     Abs,
     Max
 }
@@ -32,7 +31,6 @@ impl Map {
             Self::Distribute => distribute(&expr),
             Self::Combine => combine(&expr),
             Self::Sort => sort(&expr),
-            Self::IndependentIntegrate => independent_integrate(&expr),
             Self::Abs => abs(&expr),
             Self::Max => max(&expr),
         }
@@ -52,7 +50,6 @@ impl FromStr for Map {
             "distribute" => Ok(Self::Distribute),
             "combine" => Ok(Self::Combine),
             "sort" => Ok(Self::Sort),
-            "independent_integrate" => Ok(Self::IndependentIntegrate),
             "abs" => Ok(Self::Abs),
             "max" => Ok(Self::Max),
             _ => Err(()),
@@ -449,24 +446,6 @@ pub(crate) fn sort(e: &Expression) -> Expression {
         panic!("Cannot sort {}", e);
     }
     Expression::new(res, e.action.clone())
-}
-
-pub(crate) fn independent_integrate(e: &Expression) -> Expression {
-    assert!(is_integral(e));
-    assert_eq!(e.children.len(), 2);
-    let f = &e.children[0];
-    let var = &e.children[1];
-    let mut children = f.children.clone();
-    let f = if Action::Mul == f.action {
-        children.push(
-            var.clone()
-        );
-        Expression::new(children, Action::Mul)
-    } else {
-        Expression::new_binary(f.clone(), var.clone(), Action::Mul)
-    };
-
-    Expression::create_function(Function::Int, vec![f, var.clone()])
 }
 
 pub(crate) fn abs(e: &Expression) -> Expression {

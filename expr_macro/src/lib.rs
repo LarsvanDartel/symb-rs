@@ -135,7 +135,7 @@ fn parse_pattern(input: &mut Peekable<IntoIter>) -> TokenStream {
     if let Some(TokenTree::Punct(punct)) = input.peek() {
         if punct.as_char() == ':' {
             input.next();
-            predicate.extend(parse_predicate(input))
+            predicate.extend(parse_predicate(input, false))
         }
     }
 
@@ -182,24 +182,25 @@ fn parse_pattern(input: &mut Peekable<IntoIter>) -> TokenStream {
     }
 }
 
-fn parse_predicate(input: &mut Peekable<IntoIter>) -> TokenStream {
+fn parse_predicate(input: &mut Peekable<IntoIter>, as_expr: bool) -> TokenStream {
     if let Some(TokenTree::Punct(punct)) = input.peek() {
-        if punct.as_char() == ':' {
+        if punct.as_char() == ':' && !as_expr {
             return TokenStream::new();
         }
     }
-    let mut token = input.next().expect("Expected identifier after ':'");
-    let mut predicate = TokenStream::new();
-
+    let mut token = input.next().expect("Expected predicate");
+    
     if let TokenTree::Group(group) = token {
+        let mut predicate = TokenStream::new();
         let mut group = group.stream().into_iter().peekable();
         let mut i = 0;
         while group.peek().is_some() {
             if i > 0 {
-                eat(',', &mut group);
+                eat('&', &mut group);
+                eat('&', &mut group);
                 predicate.extend(quote! { , });
             }
-            predicate.extend(parse_predicate(&mut group));
+            predicate.extend(parse_predicate(&mut group, as_expr));
             i += 1;
         }
 
@@ -215,20 +216,27 @@ fn parse_predicate(input: &mut Peekable<IntoIter>) -> TokenStream {
         token = input.next().expect("Expected identifier after '!'")
     }
 
-    if let TokenTree::Ident(ident) = token {
+    let predicate = if let TokenTree::Ident(ident) = token {
         if let Ok(predicate_type) = PredicateType::from_str(&ident.to_string()) {
             let predicate_type = Ident::new(&format!("{:?}", predicate_type), ident.span());
-            predicate.extend(quote! {
+            quote! {
                 (::expr::PredicateType::#predicate_type, #positive)
-            });
+            }
         } else {
             panic!("Unknown predicate: {}", ident.to_string())
         }
     } else {
         panic!("Expected identifier after ':'")
-    }
+    };
 
-    predicate
+    if as_expr {
+        let children = parse_expr(input, true);
+        quote! {
+            ::expr::Expression::new(#children, ::expr::Action::Predicate(#predicate))
+        }
+    } else {
+        predicate
+    }
 }
 
 fn parse_ident(ident: Ident, input: &mut Peekable<IntoIter>) -> TokenStream {
@@ -356,29 +364,38 @@ pub fn rule(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let replacement = parse_expr(&mut input, false);
 
-    if input.peek().is_none() {
-        return proc_macro::TokenStream::from(quote! {
-            Box::new(::expr::MatchRule::new(#name, #pattern, #replacement, true))
-        });
-    }
-
-    eat(',', &mut input);
-
-    let show = if let Some(TokenTree::Ident(ident)) = input.peek() {
-        if *ident == "true" {
+    let predicate = if let Some(TokenTree::Ident(ident)) = input.peek() {
+        if *ident == "if" {
             input.next();
-            true
-        } else if *ident == "false" {
-            input.next();
-            false
+            let predicate = parse_predicate(&mut input, true);
+            quote! { Some(#predicate) }
+        } else {
+            panic!("Unexpected token: {}", ident)
+        }
+    } else {
+        quote! { None }
+    };
+
+    let show = if input.peek().is_some() {
+        eat(',', &mut input);
+        if let Some(TokenTree::Ident(ident)) = input.peek() {
+            if *ident == "true" {
+                input.next();
+                true
+            } else if *ident == "false" {
+                input.next();
+                false
+            } else {
+                panic!("Expected 'true' or 'false'")
+            }
         } else {
             panic!("Expected 'true' or 'false'")
         }
     } else {
-        panic!("Expected 'true' or 'false'")
+        true
     };
 
     proc_macro::TokenStream::from(quote! {
-        Box::new(::expr::MatchRule::new(#name, #pattern, #replacement, #show))
+        Box::new(::expr::MatchRule::new(#name, #pattern, #replacement, #predicate, #show))
     })
 }

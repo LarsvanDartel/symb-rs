@@ -58,6 +58,12 @@ pub enum Action {
 
     /// Map from expression to expression
     Map { name: String, map: Map },
+
+    /// Predicate
+    Predicate((PredicateType, bool)),
+
+    /// And
+    And,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -85,6 +91,7 @@ impl Action {
             Action::Equals => Some(2),
             Action::Fun(function) => Some(function.arity()),
             Action::Map { .. } => Some(1),
+            Action::Predicate((predicate, _)) => Some(predicate.arity()),
             _ => Some(0),
         }
     }
@@ -121,6 +128,13 @@ impl std::fmt::Display for Action {
             Action::Slot { name, .. } => f.write_fmt(format_args!("~{}", name)),
             Action::Segment { name, .. } => f.write_fmt(format_args!("~~{}", name)),
             Action::Map { name, .. } => f.write_str(name),
+            Action::Predicate((predicate, positive)) => {
+                if !*positive {
+                    f.write_str("!")?;
+                }
+                f.write_fmt(format_args!("{:?}", predicate))
+            }
+            Action::And => f.write_str("And"),
         }
     }
 }
@@ -148,6 +162,13 @@ impl std::fmt::Debug for Action {
                 .field("name", name)
                 .finish_non_exhaustive(),
             Self::Map { name, .. } => write!(f, "{:?}", name),
+            Self::Predicate((predicate, positive)) => {
+                if !*positive {
+                    write!(f, "!")?;
+                }
+                write!(f, "{:?}", predicate)
+            }
+            Self::And => write!(f, "And"),
         }
     }
 }
