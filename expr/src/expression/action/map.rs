@@ -13,6 +13,7 @@ pub enum Map {
     Distribute,
     Combine,
     Sort,
+    Abs,
 }
 
 impl Map {
@@ -25,6 +26,7 @@ impl Map {
             Self::Distribute => distribute(&expr),
             Self::Combine => combine(&expr),
             Self::Sort => sort(&expr),
+            Self::Abs => abs(&expr),
         }
     }
 }
@@ -41,6 +43,7 @@ impl FromStr for Map {
             "distribute" => Ok(Self::Distribute),
             "combine" => Ok(Self::Combine),
             "sort" => Ok(Self::Sort),
+            "abs" => Ok(Self::Abs),
             _ => Err(()),
         }
     }
@@ -388,4 +391,18 @@ pub(crate) fn sort(e: &Expression) -> Expression {
         panic!("Cannot sort {}", e);
     }
     Expression::new(res, e.action.clone())
+}
+
+pub(crate) fn abs(e: &Expression) -> Expression {
+    if let Action::Num { value } = e.action {
+        match value {
+            Number::Int(n) => Expression::create_value(n.abs()),
+            Number::Rational(n, d) => Expression::create_value((n.abs(), d.abs())),
+            Number::Real(x) => Expression::create_value(x.abs()),
+        }
+    } else if let Action::Const(_) = e.action {
+        e.clone()
+    } else {
+        panic!("Expected value, got {}", e);
+    }
 }
