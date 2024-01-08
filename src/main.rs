@@ -5,7 +5,7 @@ use expr::Expression;
 use std::io::Write;
 
 use crate::{
-    rewrite::{Rewriter, BfsRewriter},
+    rewrite::{BfsRewriter, Rewriter, SimpleRewriter},
     rules::apply_rules,
 };
 
@@ -18,7 +18,11 @@ fn main() {
         if input.trim() == "exit" {
             break;
         }
-        let mut expr = Expression::from("2*D[x^2,x]=2*2*x");
+        let simple = input.contains("simple");
+        if simple {
+            input = input.replace("simple", "");
+        }
+        let mut expr = Expression::from(input);
 
         if expr.is_equality() {
             let mut lhs = expr.get_lhs().unwrap().clone();
@@ -26,7 +30,11 @@ fn main() {
             let mut rhs = expr.get_rhs().unwrap().clone();
             apply_rules(&rules::CLEANUP_RULES, &mut rhs, false, false);
             println!("Received: {} = {}", lhs, rhs);
-            let records = if let Some(records) = BfsRewriter::rewrite(&lhs, &rhs, &rules::FULL_EXPAND_RULES) {
+            let records = if let Some(records) = if simple {
+                SimpleRewriter::rewrite(&lhs, &rhs, &rules::FULL_EXPAND_RULES)
+            } else {
+                BfsRewriter::rewrite(&lhs, &rhs, &rules::FULL_EXPAND_RULES)
+            } {
                 records
             } else {
                 println!("Could not rewrite");
@@ -36,24 +44,12 @@ fn main() {
                 continue;
             }
             println!("Rewrite records:");
-            let lmax = records
-                .iter()
-                .map(|record| record.old.to_string().len())
-                .max()
-                .unwrap();
-            let rmax = records
-                .iter()
-                .map(|record| record.new.to_string().len())
-                .max()
-                .unwrap();
             for record in records {
                 println!(
-                    "=> {:>lmax$} = {:<rmax$}   ({})",
+                    "=> {} = {}   ({})",
                     record.old.to_string(),
                     record.new.to_string(),
                     record.message,
-                    lmax = lmax,
-                    rmax = rmax
                 );
             }
         } else {
