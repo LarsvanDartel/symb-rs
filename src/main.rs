@@ -50,12 +50,12 @@ fn main() {
                 .unwrap();
             for record in records {
                 println!(
-                    "=> {}{} = {}{}    ({})",
-                    " ".repeat(lmax - record.old.to_string().len()),
-                    record.old,
-                    record.new,
-                    " ".repeat(rmax - record.new.to_string().len()),
-                    record.message
+                    "=> {:>lmax$} = {:>rmax$}   ({})",
+                    record.old.to_string(),
+                    record.new.to_string(),
+                    record.message,
+                    lmax = lmax,
+                    rmax = rmax
                 );
             }
         } else {
