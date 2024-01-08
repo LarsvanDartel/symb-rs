@@ -108,7 +108,11 @@ impl Expression {
                     Some(self.children[1].clone()),
                 )
             } else {
-                (Some(self.clone()), None)
+                if let Action::Num { .. } = self.action {
+                    (None, Some(self.clone()))
+                } else {
+                    (Some(self.clone()), None)
+                }
             }
         } else {
             panic!("Invalid action {:?}", action);

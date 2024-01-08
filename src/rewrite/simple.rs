@@ -1,5 +1,3 @@
-extern crate expr;
-
 use crate::rules::apply_rules;
 
 use super::{Rewriter, RewriteRecord};
@@ -33,8 +31,8 @@ impl Rewriter for SimpleRewriter {
 
         records.extend(a_records.into_iter().take(na));
         records.extend(b_records.into_iter().take(nb).map(|record| RewriteRecord {
-            old: record.old,
-            new: record.new,
+            old: record.new,
+            new: record.old,
             message: record.message,
         }).rev());
 

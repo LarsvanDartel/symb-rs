@@ -1,5 +1,3 @@
-extern crate expr;
-
 mod rewrite;
 mod rules;
 
@@ -7,7 +5,7 @@ use expr::Expression;
 use std::io::Write;
 
 use crate::{
-    rewrite::{Rewriter, SimpleRewriter},
+    rewrite::{Rewriter, BfsRewriter},
     rules::apply_rules,
 };
 
@@ -20,7 +18,7 @@ fn main() {
         if input.trim() == "exit" {
             break;
         }
-        let mut expr = Expression::from(input);
+        let mut expr = Expression::from("2*D[x^2,x]=2*2*x");
 
         if expr.is_equality() {
             let mut lhs = expr.get_lhs().unwrap().clone();
@@ -28,7 +26,7 @@ fn main() {
             let mut rhs = expr.get_rhs().unwrap().clone();
             apply_rules(&rules::CLEANUP_RULES, &mut rhs, false, false);
             println!("Received: {} = {}", lhs, rhs);
-            let records = if let Some(records) = SimpleRewriter::rewrite(&lhs, &rhs, &rules::FULL_EXPAND_RULES) {
+            let records = if let Some(records) = BfsRewriter::rewrite(&lhs, &rhs, &rules::FULL_EXPAND_RULES) {
                 records
             } else {
                 println!("Could not rewrite");
@@ -50,7 +48,7 @@ fn main() {
                 .unwrap();
             for record in records {
                 println!(
-                    "=> {:>lmax$} = {:>rmax$}   ({})",
+                    "=> {:>lmax$} = {:<rmax$}   ({})",
                     record.old.to_string(),
                     record.new.to_string(),
                     record.message,

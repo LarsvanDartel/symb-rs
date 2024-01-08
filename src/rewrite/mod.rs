@@ -1,11 +1,12 @@
-extern crate expr;
-
 mod simple;
+mod bfsrewriter;
 
-pub use self::simple::SimpleRewriter;
+pub use simple::SimpleRewriter;
+pub use bfsrewriter::BfsRewriter;
 
 use expr::{Expression, Rule};
 
+#[derive(Clone)]
 pub struct RewriteRecord {
     pub message: String,
     pub old: Expression,

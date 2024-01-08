@@ -1,33 +1,47 @@
-extern crate expr;
-extern crate expr_macro;
-
 use expr::{Expression, Rule};
 use expr_macro::rule;
 use once_cell::sync::Lazy;
 
 use crate::rewrite::RewriteRecord;
 
-pub fn apply_rules(rules: &[Rule], expr: &mut Expression, finalize: bool, print: bool) -> Vec<RewriteRecord> {
+pub fn apply_rule(
+    rule: &Rule,
+    expr: &mut Expression,
+    finalize: bool,
+    print: bool,
+) -> Option<RewriteRecord> {
+    let mut new_expr = expr.apply_rule(rule)?;
+    if finalize {
+        apply_rules(&FINALIZE_RULES, &mut new_expr, false, false);
+    }
+    if print && rule.counts() {
+        println!("{}: {} = {}", rule.name(), expr, new_expr);
+    }
+    Some(RewriteRecord {
+        message: rule.name().to_string(),
+        old: expr.clone(),
+        new: new_expr.clone(),
+    })
+}
+
+pub fn apply_rules(
+    rules: &[Rule],
+    expr: &mut Expression,
+    finalize: bool,
+    print: bool,
+) -> Vec<RewriteRecord> {
     let mut records = Vec::new();
     let mut cnt = 0;
     loop {
         let mut applied = false;
         for rule in rules {
-            if let Some(mut new_expr) = expr.apply_rule(rule) {
-                if finalize {
-                    apply_rules(&FINALIZE_RULES, &mut new_expr, false, false);
-                }
-                if print && rule.counts() {
-                    cnt += 1;
-                    println!("{}: {} = {}", rule.name(), expr, new_expr);
-                }
-                records.push(RewriteRecord {
-                    message: rule.name().to_string(),
-                    old: expr.clone(),
-                    new: new_expr.clone(),
-                });
-                *expr = new_expr;
+            if let Some(record) = apply_rule(rule, expr, finalize, print) {
+                *expr = record.new.clone();
                 applied = true;
+                if rule.counts() {
+                    cnt += 1;
+                    records.push(record);
+                }
                 break;
             }
         }
@@ -43,8 +57,8 @@ pub fn apply_rules(rules: &[Rule], expr: &mut Expression, finalize: bool, print:
 
 pub static CLEANUP_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
     vec![
-        rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b), false),
-        rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b), false),
+        rule!("associativity addition", +(+(~~a::1), ~~b::1) => +(~~a, ~~b), false),
+        rule!("associativity multiplication", *(*(~~a::1), ~~b::1) => *(~~a, ~~b), false),
         rule!("create rational", /(~a:is_integer, ~b:(is_integer && !is_zero)) => create_rational(/(~a, ~b)), false),
     ]
 });
@@ -59,7 +73,7 @@ static FORM_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
 
 static ADDITION_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
     vec![
-        rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b), false),
+        rule!("associativity addition", +(+(~~a::1), ~~b::1) => +(~~a, ~~b), false),
         rule!("collapse addition", +(~a) => ~a, false),
         rule!("numeric addition", +(~~a:is_number:2, ~~b:!is_number) => +(reduce(~~a), ~~b)),
         rule!("identity addition", +(~~a:!is_zero:1, ~~b:is_zero:1) => ~~a),
@@ -68,7 +82,7 @@ static ADDITION_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
 
 static MULTIPLICATION_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
     vec![
-        rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b), false),
+        rule!("associativity multiplication", *(*(~~a::1), ~~b::1) => *(~~a, ~~b), false),
         rule!("collapse multiplication", *(~a) => ~a, false),
         rule!("numeric multiplication", *(~~a:is_number:2, ~~b:!is_number) => *(reduce(~~a), ~~b)),
         rule!("identity multiplication", *(~~a:!is_one:1, ~~b:is_one:1) => ~~a),
@@ -249,8 +263,8 @@ pub static FULL_EXPAND_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
 
 static FINALIZE_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
     vec![
-        rule!("associativity addition", +(+(~~a), ~~b) => +(~~a, ~~b), false),
-        rule!("associativity multiplication", *(*(~~a), ~~b) => *(~~a, ~~b), false),
+        rule!("associativity addition", +(+(~~a::1), ~~b::1) => +(~~a, ~~b), false),
+        rule!("associativity multiplication", *(*(~~a::1), ~~b::1) => *(~~a, ~~b), false),
         rule!("collapse addition", +(~a) => ~a, false),
         rule!("collapse multiplication", *(~a) => ~a, false),
         rule!("reorder terms", ~a:!is_sorted => sort(~a), false),
