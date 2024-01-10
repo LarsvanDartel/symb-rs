@@ -1,5 +1,13 @@
 from symb_rs import run
 
 while True:
-    records = run(input("calc > "))
-    print(records, end="")
+    try: 
+        records = run(input("calc > "))
+    except KeyboardInterrupt:
+        print()
+        break
+    except ValueError as e:
+        print(e)
+        continue
+    else:
+        print(records, end="")
