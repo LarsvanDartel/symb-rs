@@ -84,15 +84,15 @@ impl Action {
         }
     }
 
-    pub fn arity(&self) -> Option<usize> {
+    pub fn arity(&self) -> Option<(usize, usize)> {
         match self {
             Action::Add | Action::Mul => None,
-            Action::Sub | Action::Div | Action::Pow => Some(2),
-            Action::Equals => Some(2),
+            Action::Sub | Action::Div | Action::Pow => Some((2, 2)),
+            Action::Equals => Some((2, 2)),
             Action::Fun(function) => Some(function.arity()),
-            Action::Map { .. } => Some(1),
+            Action::Map { .. } => Some((1, 1)),
             Action::Predicate((predicate, _)) => Some(predicate.arity()),
-            _ => Some(0),
+            _ => Some((0, 0)),
         }
     }
 

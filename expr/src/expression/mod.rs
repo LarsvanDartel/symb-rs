@@ -22,11 +22,12 @@ pub struct Expression {
 impl Expression {
     pub fn new(children: Vec<Expression>, action: Action) -> Self {
         if let Some(arity) = action.arity() {
-            if children.len() != arity {
+            if children.len() < arity.0 || children.len() > arity.1 {
                 panic!(
-                    "Wrong number of arguments for {:?}: expected {}, got {}",
+                    "Wrong number of arguments for {:?}: expected ({}, {}), got {}",
                     action,
-                    arity,
+                    arity.0,
+                    arity.1,
                     children.len()
                 );
             }
@@ -360,6 +361,9 @@ impl Expression {
                     patterns.insert(name.clone(), other.clone());
                     true
                 }
+            }
+            (Action::Fun(Function::Max), Action::Fun(Function::Max)) => {
+                self.match_children_unordered(other, patterns)
             }
             (Action::Add, Action::Add) => self.match_children_unordered(other, patterns),
             (Action::Mul, Action::Mul) => self.match_children_unordered(other, patterns),
