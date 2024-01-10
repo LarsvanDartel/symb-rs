@@ -229,7 +229,7 @@ static TRIG_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
 static MISC_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
     vec![
         rule!("abs", Abs(~n:is_value) => abs(~n)),
-        rule!("max", Max(~a:is_value, ~b:is_value) => max(Max(~a, ~b))),
+        rule!("max", Max(~~a:is_value) => max(Max(~~a))),
     ]
 });
 

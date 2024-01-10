@@ -42,12 +42,12 @@ pub enum Function {
 }
 
 impl Function {
-    pub fn arity(&self) -> usize {
+    pub fn arity(&self) -> (usize, usize) {
         match self.clone() {
-            Function::Root | Function::Log => 2,
-            Function::D | Function::Int => 2,
-            Function::Max => 2,
-            _ => 1,
+            Function::Root | Function::Log => (2, 2),
+            Function::D | Function::Int => (2, 2),
+            Function::Max => (1, usize::MAX),
+            _ => (1, 1),
         }
     }
 }

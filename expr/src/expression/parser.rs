@@ -244,10 +244,12 @@ impl Parser {
                 let right_paren = self.eat(TokenType::RightParenthesis)?;
                 Self::matching_parentheses(left_paren, right_paren)?;
                 let fun = Function::from_str(&fun.lexeme.unwrap())?;
-                if fun.arity() != args.len() {
+                let arity = fun.arity();
+                if args.len() < arity.0 || args.len() > arity.1 {
                     Err(format!(
-                        "Expected {} arguments, found {}",
-                        fun.arity(),
+                        "Expected ({}, {}) arguments, found {}",
+                        arity.0,
+                        arity.1,
                         args.len()
                     ))?;
                 }

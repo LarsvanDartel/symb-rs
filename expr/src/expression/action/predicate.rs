@@ -43,22 +43,24 @@ pub enum PredicateType {
 }
 
 impl PredicateType {
-    pub(crate) fn arity(&self) -> usize {
+    pub(crate) fn arity(&self) -> (usize, usize) {
         match self {
-            Self::IsIndependent => 2,
-            _ => 1,
+            Self::IsIndependent => (2, 2),
+            _ => (1, 1),
         }
     }
 
     pub(crate) fn eval(&self, args: &[Expression]) -> bool {
-        if self.arity() != args.len() {
+        let arity = self.arity();
+        if args.len() < arity.0 || args.len() > arity.1 {
             panic!(
-                "Expected {} arguments, got {}",
-                self.arity(),
+                "Expected ({}, {}) arguments, got {}",
+                self.arity().0,
+                self.arity().1,
                 args.len()
             );
         }
-        if self.arity() == 1 {
+        if arity == (1, 1) {
             return self.matches(&args[0]);
         }
         match self {

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str::FromStr};
 
 use super::predicate::{
-    is_integer, is_number, is_one, is_root_reducible, is_value, is_zero, is_nonnegative,
+    is_integer, is_nonnegative, is_number, is_one, is_root_reducible, is_value, is_zero,
 };
 use super::{Action, Expression, Function, Number};
 use num_integer::{Integer, Roots};
@@ -17,7 +17,7 @@ pub enum Map {
     Combine,
     Sort,
     Abs,
-    Max
+    Max,
 }
 
 impl Map {
@@ -308,7 +308,7 @@ pub(crate) fn log_reduce(e: &Expression) -> Expression {
         Number::Rational(num, den) => {
             assert!(num == 1);
             (den, true)
-        },
+        }
         Number::Real(f) => {
             return Expression::create_value(f.log(base as f64).round());
         }
@@ -480,24 +480,23 @@ pub(crate) fn abs(e: &Expression) -> Expression {
 
 pub(crate) fn max(e: &Expression) -> Expression {
     assert_eq!(e.action, Action::Fun(Function::Max));
-    assert_eq!(e.children.len(), 2);
-    let a = if let Action::Num { value } = &e.children[0].action {
-        *value
-    } else if let Action::Const(c) = &e.children[0].action {
-        Number::from(*c)
-    } else {
-        panic!("Expected number, got {}", e.children[0]);
-    };
-    let b = if let Action::Num { value } = &e.children[1].action {
-        *value
-    } else if let Action::Const(c) = &e.children[1].action {
-        Number::from(*c)
-    } else {
-        panic!("Expected number, got {}", e.children[1]);
-    };
-    if a > b {
-        e.children[0].clone()
-    } else {
-        e.children[1].clone()
-    }
+    assert!(e.children.len() >= Function::Max.arity().0);
+
+    let maximum_index = e
+        .children
+        .iter()
+        .map(|c| {
+            if let Action::Num { value } = &c.action {
+                *value
+            } else if let Action::Const(c) = &c.action {
+                Number::from(*c)
+            } else {
+                panic!("Expected number, got {}", c);
+            }
+        })
+        .enumerate()
+        .reduce(|(i, a), (j, b)| if b > a { (j, b) } else { (i, a) })
+        .unwrap()
+        .0;
+    return e.children[maximum_index].clone();
 }
