@@ -8,14 +8,10 @@ pub fn apply_rule(
     rule: &Rule,
     expr: &mut Expression,
     finalize: bool,
-    print: bool,
 ) -> Option<RewriteRecord> {
     let mut new_expr = expr.apply_rule(rule)?;
     if finalize {
-        apply_rules(&FINALIZE_RULES, &mut new_expr, false, false);
-    }
-    if print && rule.counts() {
-        println!("{}: {} = {}", rule.name(), expr, new_expr);
+        apply_rules(&FINALIZE_RULES, &mut new_expr, false);
     }
     Some(RewriteRecord {
         message: rule.name().to_string(),
@@ -28,18 +24,15 @@ pub fn apply_rules(
     rules: &[Rule],
     expr: &mut Expression,
     finalize: bool,
-    print: bool,
 ) -> Vec<RewriteRecord> {
     let mut records = Vec::new();
-    let mut cnt = 0;
     loop {
         let mut applied = false;
         for rule in rules {
-            if let Some(record) = apply_rule(rule, expr, finalize, print) {
+            if let Some(record) = apply_rule(rule, expr, finalize) {
                 *expr = record.new.clone();
                 applied = true;
                 if rule.counts() {
-                    cnt += 1;
                     records.push(record);
                 }
                 break;
@@ -48,9 +41,6 @@ pub fn apply_rules(
         if !applied {
             break;
         }
-    }
-    if print && cnt != 0 {
-        println!("{} rule{} applied", cnt, if cnt == 1 { "" } else { "s" });
     }
     records
 }
@@ -163,6 +153,7 @@ static LOG_RULES: Lazy<Vec<Rule>> = Lazy::new(|| {
         rule!("logb(b^x)=x", Log(~base, ^(~base, ~x)) => ~x),
         rule!("log(a) + log(b) = log(ab)", +(Ln(~a), Ln(~b), ~~c) => +(Ln(*(~a, ~b)), ~~c)),
         rule!("log(a) + log(b) = log(ab)", +(Log(~base, ~a), Log(~base, ~b), ~~c) => +(Log(~base, *(~a, ~b)), ~~c)),
+        rule!("log(a) - log(b) = log(a/b)", -(Ln(~a), Ln(~b)) => Ln(/(~a, ~b))),
         rule!("n * log(a) = log(a^n)", *(~n:(is_integer && !is_one), Ln(~a), ~~b) => *(Ln(^(~a, ~n)), ~~b)),
         rule!("n * log(a) = log(a^n)", *(~n:(is_integer && !is_one), Log(~base, ~a), ~~b) => *(Log(~base, ^(~a, ~n)), ~~b)),
     ]

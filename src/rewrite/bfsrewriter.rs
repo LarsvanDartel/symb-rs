@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, VecDeque, HashSet};
 
 use expr::{Expression, Rule};
 
@@ -6,9 +6,64 @@ use crate::rules::apply_rule;
 
 use super::{RewriteRecord, Rewriter, SimpleRewriter};
 
-pub struct BfsRewriter;
+pub struct SingleBfsRewriter;
 
-impl Rewriter for BfsRewriter {
+impl Rewriter for SingleBfsRewriter {
+    fn rewrite(a: &Expression, b: &Expression, rules: &[Rule]) -> Option<Vec<RewriteRecord>> {
+        let bound = 10;
+        let mut seen = HashSet::new();
+        let mut prev = HashMap::new();
+        let mut queue = VecDeque::new();
+
+        queue.push_back((a.clone(), 0));
+
+        while let Some((mut expr, depth)) = queue.pop_front() {
+            if depth > bound {
+                continue;
+            }
+            if seen.contains(&expr) {
+                continue;
+            }
+            seen.insert(expr.clone());
+            if &expr == b {
+                break;
+            }
+            for rule in rules {
+                if let Some(record) = apply_rule(rule, &mut expr, true) {
+                    let new_expr = record.new.clone();
+                    if !prev.contains_key(&new_expr) {
+                        prev.insert(
+                            new_expr.clone(),
+                            (expr.clone(), rule.name().to_string()),
+                        );
+                    }
+                    queue.push_back((new_expr, depth + 1));
+                }
+            }
+        }
+
+        let mut records = Vec::new();
+        let mut expr = b;
+        if !prev.contains_key(expr) {
+            return None;
+        }
+        while expr != a {
+            let (prev_expr, rule_name) = prev.get(expr).unwrap();
+            records.push(RewriteRecord {
+                message: rule_name.clone(),
+                old: prev_expr.clone(),
+                new: expr.clone(),
+            });
+            expr = prev_expr;
+        }
+        records.reverse();
+        Some(records)
+    }
+}
+
+pub struct DoubleBfsRewriter;
+
+impl Rewriter for DoubleBfsRewriter {
     fn rewrite(a: &Expression, b: &Expression, rules: &[Rule]) -> Option<Vec<RewriteRecord>> {
         let mut bound = SimpleRewriter::rewrite(a, b, rules)?.len();
 
@@ -44,7 +99,7 @@ impl Rewriter for BfsRewriter {
                 }
             }
             for rule in rules {
-                if let Some(record) = apply_rule(rule, &mut expr, true, false) {
+                if let Some(record) = apply_rule(rule, &mut expr, true) {
                     let new_expr = record.new.clone();
                     if !prev.contains_key(&(record.new, is_a)) {
                         prev.insert(

@@ -68,6 +68,7 @@ pub enum Action {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Priority {
+    Equals = 0,
     AddSub = 1,
     MulDiv = 2,
     Pow = 3,
@@ -80,6 +81,7 @@ impl Action {
             Action::Add | Action::Sub => Priority::AddSub,
             Action::Mul | Action::Div => Priority::MulDiv,
             Action::Pow => Priority::Pow,
+            Action::Equals => Priority::Equals,
             _ => Priority::None,
         }
     }

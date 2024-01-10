@@ -2,7 +2,7 @@ mod simple;
 mod bfsrewriter;
 
 pub use simple::SimpleRewriter;
-pub use bfsrewriter::BfsRewriter;
+pub use bfsrewriter::{SingleBfsRewriter, DoubleBfsRewriter};
 
 use expr::{Expression, Rule};
 
@@ -11,6 +11,32 @@ pub struct RewriteRecord {
     pub message: String,
     pub old: Expression,
     pub new: Expression,
+}
+
+impl RewriteRecord {
+    pub fn reverse(&self) -> RewriteRecord {
+        RewriteRecord {
+            message: self.message.clone(),
+            old: self.new.clone(),
+            new: self.old.clone(),
+        }
+    }
+
+    pub fn print_records(mut records: Vec<RewriteRecord>) {
+        for record in records.iter_mut() {
+            record.message = format!("({})", record.message);
+        }
+        let max = records.iter().map(|record| record.message.len()).max().unwrap();
+        for record in records {
+            println!(
+                "{:<width$} => {} = {}",
+                record.message,
+                record.old.to_string(),
+                record.new.to_string(),
+                width = max
+            );
+        }
+    }
 }
 
 pub trait Rewriter {

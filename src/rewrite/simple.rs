@@ -1,6 +1,6 @@
 use crate::rules::apply_rules;
 
-use super::{Rewriter, RewriteRecord};
+use super::{RewriteRecord, Rewriter};
 use expr::{Expression, Rule};
 pub struct SimpleRewriter;
 
@@ -9,13 +9,13 @@ impl Rewriter for SimpleRewriter {
         let mut a = a.clone();
         let mut b = b.clone();
 
-        let a_records = apply_rules(rules, &mut a, true, false);
-        let b_records = apply_rules(rules, &mut b, true, false);
+        let a_records = apply_rules(rules, &mut a, true);
+        let b_records = apply_rules(rules, &mut b, true);
 
         if a != b {
             return None;
         }
-        
+
         // remove records from the tail where a and b match
         let mut i = 0;
         while i < a_records.len() && i < b_records.len() {
@@ -30,11 +30,13 @@ impl Rewriter for SimpleRewriter {
         let mut records = Vec::new();
 
         records.extend(a_records.into_iter().take(na));
-        records.extend(b_records.into_iter().take(nb).map(|record| RewriteRecord {
-            old: record.new,
-            new: record.old,
-            message: record.message,
-        }).rev());
+        records.extend(
+            b_records
+                .into_iter()
+                .take(nb)
+                .map(|r: RewriteRecord| r.reverse())
+                .rev(),
+        );
 
         Some(records)
     }
