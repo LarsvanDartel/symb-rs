@@ -95,6 +95,13 @@ dependencies = [
 name = "symb-rs"
 version = "0.1.0"
 dependencies = [
+ "symb_rs_core",
+]
+
+[[package]]
+name = "symb_rs_core"
+version = "0.1.0"
+dependencies = [
  "expr",
  "expr_macro",
  "once_cell",

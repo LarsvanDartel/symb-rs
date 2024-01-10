@@ -510,7 +510,7 @@ mod tests {
         let mut tokens = Vec::new();
         loop {
             let t = p.next_token().unwrap();
-            if t.token == TokenType::EOF {
+            if t.token == TokenType::EndOfFile {
                 break;
             }
             tokens.push(t);

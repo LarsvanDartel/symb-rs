@@ -1,10 +1,6 @@
-use expr::Expression;
-use std::io::Write;
+use symb_rs_core::*;
 
-use symb::{
-    rewrite::{DoubleBfsRewriter, Rewriter, SimpleRewriter, SingleBfsRewriter, RewriteRecord},
-    rules::{apply_rules, CLEANUP_RULES, FULL_EXPAND_RULES},
-};
+use std::io::Write;
 
 fn main() {
     loop {
