@@ -1,7 +1,7 @@
 use expr::Expression;
 use std::io::Write;
 
-use symb::{
+use symb_rs::{
     rewrite::{DoubleBfsRewriter, Rewriter, SimpleRewriter, SingleBfsRewriter, RewriteRecord},
     rules::{apply_rules, CLEANUP_RULES, FULL_EXPAND_RULES},
 };
